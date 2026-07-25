@@ -1,0 +1,28 @@
+# Nginx reverse proxy — put this at /etc/nginx/sites-available/foodhouse
+# then: sudo ln -s /etc/nginx/sites-available/foodhouse /etc/nginx/sites-enabled/
+#
+# Replace admin.yourplatform.com with your real domain(s). You can add MORE
+# server blocks later for each restaurant's own custom domain (e.g.
+# foodhouse.com) — they all point at the same Node app on port 4000; the
+# app itself figures out which restaurant is which (see js/api.js).
+
+server {
+    listen 80;
+    server_name admin.yourplatform.com;   # <-- change this
+
+    location / {
+        proxy_pass http://localhost:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# After this is working on plain HTTP, run:
+#   sudo certbot --nginx -d admin.yourplatform.com
+# Certbot will automatically add the HTTPS server block + redirect for you.

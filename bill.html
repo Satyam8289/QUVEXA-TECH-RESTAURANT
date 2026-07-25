@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Bill — The Food House</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+  <style>
+    .bill-paper { background:var(--white); border:1px solid var(--line); border-radius:var(--radius); margin:18px; padding:26px 22px; }
+    .bill-head { text-align:center; padding-bottom:16px; border-bottom:1px dashed var(--line); margin-bottom:16px; }
+    .bill-head .brand-mark { margin:0 auto 10px; }
+    .bill-head h2 { font-family:var(--serif); font-size:20px; }
+    .bill-head small { color:var(--muted); display:block; margin-top:2px; }
+    .bill-meta { display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); margin-bottom:16px; }
+    .bill-table { width:100%; border-collapse:collapse; font-size:13.5px; }
+    .bill-table th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding-bottom:8px; border-bottom:1px solid var(--line); }
+    .bill-table td { padding:7px 0; border-bottom:1px dashed var(--line); }
+    .bill-table td.num, .bill-table th.num { text-align:right; }
+    .bill-totals { margin-top:14px; }
+    .bill-totals .row { display:flex; justify-content:space-between; font-size:13.5px; padding:4px 0; color:var(--muted); }
+    .bill-totals .row.grand { color:var(--ink); font-weight:700; font-size:17px; padding-top:10px; margin-top:6px; border-top:1px dashed var(--line); }
+    .bill-foot { text-align:center; margin-top:20px; color:var(--muted); font-size:12px; }
+    .bill-actions { display:flex; gap:10px; padding:0 18px 24px; }
+    @media print {
+      body { background:#fff; }
+      .no-print { display:none !important; }
+      .bill-paper { margin:0; border:none; box-shadow:none; }
+      .phone { box-shadow:none; max-width:none; }
+    }
+  </style>
+</head>
+<body class="customer">
+  <div class="phone">
+    <div id="brand" class="no-print"></div>
+    <div id="content"><div class="skeleton" style="padding:60px;text-align:center;color:var(--muted)">Loading bill…</div></div>
+    <div class="bill-actions no-print" id="actions"></div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    async function main() {
+      const params = new URLSearchParams(location.search);
+      const code = params.get("code");
+      if (!code) { location.href = "index.html"; return; }
+      try {
+        const data = await Api.loadPublic();
+        const order = await Api.getOrderByCode(code);
+        document.getElementById("brand").innerHTML = App.brandBar({ back: "tracking.html", subtitle: "Bill / Receipt", orders: false });
+
+        const gst = Math.round(order.total * 0.05 / 1.08); // approx breakdown for display only
+        document.getElementById("content").innerHTML = `
+          <div class="bill-paper">
+            <div class="bill-head">
+              ${App.brandMark(52)}
+              <h2>${data.tenant.name}</h2>
+              <small>${data.tenant.address || ""}</small>
+            </div>
+            <div class="bill-meta">
+              <span>Bill No. <b style="color:var(--ink)">${order.code}</b></span>
+              <span>${new Date(order.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>
+            </div>
+            <div class="bill-meta" style="margin-top:-10px">
+              <span>Table ${order.table ?? "—"} · ${order.customer || "Guest"}</span>
+              <span>${order.method}</span>
+            </div>
+            <table class="bill-table">
+              <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Amount</th></tr></thead>
+              <tbody>
+                ${order.items.map(it => `<tr><td>${it.name}</td><td class="num">${it.qty}</td><td class="num">${App.money(it.price)}</td><td class="num">${App.money(it.price * it.qty)}</td></tr>`).join("")}
+              </tbody>
+            </table>
+            <div class="bill-totals">
+              <div class="row grand"><span>Total paid</span><span>${App.money(order.total)}</span></div>
+            </div>
+            <div class="bill-foot">Thank you for dining with us!<br>Order status: <b style="color:var(--ink);text-transform:capitalize">${order.status}</b></div>
+          </div>`;
+
+        document.getElementById("actions").innerHTML = `
+          <button class="btn btn-block btn-lg" id="printBtn">${App.icon("clipboard",18)} Download / Print</button>
+          <a class="btn btn-wa btn-block btn-lg" target="_blank" rel="noopener" href="${App.whatsappOrderLink(order, order.phone)}">${App.icon("whatsapp",18)} WhatsApp</a>`;
+        document.getElementById("printBtn").addEventListener("click", () => window.print());
+      } catch (e) {
+        document.getElementById("content").innerHTML =
+          `<div class="empty">${App.icon("alert",40)}<h3>Bill not found</h3><p>${e.message || "Please check the link and try again."}</p></div>`;
+      }
+    }
+    main();
+  </script>
+</body>
+</html>

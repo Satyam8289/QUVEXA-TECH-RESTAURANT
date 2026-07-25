@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Your Cart — The Food House</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+</head>
+<body class="customer">
+  <div class="phone">
+    <div id="brand"></div>
+    <div id="content"></div>
+  </div>
+
+  <div class="docked" id="dock"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    function render() {
+      const items = Cart.all();
+      const content = document.getElementById("content");
+      const dock = document.getElementById("dock");
+
+      if (!items.length) {
+        content.innerHTML = `<div class="empty">${App.icon("cart",44)}<h3>Your cart is empty</h3><p>Add some delicious dishes to get started.</p><a class="btn" style="margin-top:18px" href="menu.html">Browse Menu</a></div>`;
+        dock.innerHTML = "";
+        return;
+      }
+
+      content.innerHTML = `
+        <div class="section" style="padding-bottom:8px">
+          <div class="stack">
+            ${items.map(lineHTML).join("")}
+          </div>
+        </div>
+        <div class="section" style="padding-top:8px">
+          <div class="card summary">
+            <div class="row"><span>Subtotal</span><span>${App.money(sub())}</span></div>
+            <div class="row"><span>GST (5%)</span><span>${App.money(gst())}</span></div>
+            <div class="row"><span>Service charge</span><span>${App.money(service())}</span></div>
+            <div class="row total"><span>Total</span><span>${App.money(total())}</span></div>
+          </div>
+        </div>
+        <div style="height:20px"></div>`;
+
+      dock.innerHTML = `<a class="btn btn-block btn-lg" href="checkout.html">Proceed to Checkout · ${App.money(total())}</a>`;
+      bind();
+    }
+
+    function lineHTML(l) {
+      return `
+      <div class="card cart-line" data-id="${l.id}">
+        <img src="${l.image}" alt="${l.name}" onerror="App.imgFallback(this)" />
+        <div class="info">
+          <b>${l.name}</b>
+          <div style="color:var(--muted);font-size:12px">${App.money(l.price)} each</div>
+          <input class="note-in" placeholder="Add a note (e.g. less spicy)" value="${l.note || ""}" data-note="${l.id}" />
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px">
+          <div class="line-price">${App.money(l.price * l.qty)}</div>
+          <div class="stepper" data-id="${l.id}">
+            <button data-act="dec">${App.icon("minus",16)}</button><b>${l.qty}</b>
+            <button data-act="inc">${App.icon("plus",16)}</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    const sub = () => Cart.subtotal();
+    const gst = () => Math.round(sub() * 0.05);
+    const service = () => Math.round(sub() * 0.03);
+    const total = () => sub() + gst() + service();
+
+    function bind() {
+      document.querySelectorAll(".stepper").forEach(s => {
+        const id = s.dataset.id;
+        s.querySelector('[data-act="inc"]').addEventListener("click", () => { Cart.setQty(id, Cart.qtyOf(id) + 1); render(); });
+        s.querySelector('[data-act="dec"]').addEventListener("click", () => { Cart.setQty(id, Cart.qtyOf(id) - 1); render(); });
+      });
+      document.querySelectorAll("[data-note]").forEach(inp =>
+        inp.addEventListener("change", () => Cart.setNote(inp.dataset.note, inp.value)));
+    }
+
+    async function main() {
+      try { await Api.loadPublic(); } catch (e) { /* still render cart from local storage even if offline */ }
+      document.getElementById("brand").innerHTML = App.brandBar({ back: "menu.html", subtitle: "Your Order" });
+      render();
+    }
+    main();
+  </script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Menu — The Food House</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+</head>
+<body class="customer">
+  <div class="phone">
+    <div id="brand"></div>
+    <div id="closedBanner"></div>
+
+    <div class="searchbar">
+      <span id="searchIco"></span>
+      <input id="search" type="search" placeholder="Search dishes, e.g. biryani, paneer…" autocomplete="off" />
+    </div>
+
+    <div class="filters" id="filters"></div>
+
+    <div class="veg-toggle">
+      <span>Pure veg only</span>
+      <label class="switch"><input type="checkbox" id="vegOnly" /><span class="slider"></span></label>
+    </div>
+
+    <div class="menu-list" id="menuList"></div>
+  </div>
+
+  <div class="cartbar hidden" id="cartbar">
+    <a class="cartbar-inner" href="cart.html">
+      <div>
+        <span class="count" id="cartCount">0 items</span><br>
+        <strong id="cartTotal">₹0</strong>
+      </div>
+      <span class="go">View Cart <span id="goIco"></span></span>
+    </a>
+  </div>
+
+  <!-- Customer identity gate: asked once, before the first item is added -->
+  <div class="modal-back" id="gateBack" style="position:fixed;inset:0;background:rgba(12,30,20,.5);backdrop-filter:blur(3px);z-index:70;display:none;align-items:center;justify-content:center;padding:20px">
+    <form class="card" id="gateForm" style="width:100%;max-width:400px;padding:26px 24px">
+      <h3 style="font-family:var(--serif);font-size:20px;margin-bottom:6px">Just before you order…</h3>
+      <p style="color:var(--muted);font-size:13.5px;margin-bottom:18px">We'll use this to confirm your order and let you look up your order history any time.</p>
+      <div class="field"><label for="gateName">Your name</label><input class="input" id="gateName" required placeholder="e.g. Ananya" /></div>
+      <div class="field" style="margin-bottom:0"><label for="gatePhone">Phone number</label><input class="input" id="gatePhone" required type="tel" inputmode="tel" placeholder="+91 98765 43210" /></div>
+      <button class="btn btn-block btn-lg" type="submit" style="margin-top:18px">Continue to Cart</button>
+    </form>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.getElementById("searchIco").innerHTML = App.icon("search", 18);
+    document.getElementById("goIco").innerHTML = App.icon("back", 16);
+    document.querySelector("#goIco svg").style.transform = "rotate(180deg)";
+
+    let CATEGORIES = [], MENU = [], STORE_CLOSED = false;
+    let activeCat = "all";
+    let query = "";
+    let vegOnly = false;
+
+    // Filters
+    const filtersEl = document.getElementById("filters");
+    function renderFilters() {
+      const cats = [{ id: "all", name: "All" }, ...CATEGORIES.map(c => ({ id: c.slug, name: c.name }))];
+      filtersEl.innerHTML = cats.map(c =>
+        `<button class="pill ${activeCat === c.id ? "active" : ""}" data-cat="${c.id}">${c.name}</button>`
+      ).join("");
+      filtersEl.querySelectorAll(".pill").forEach(p =>
+        p.addEventListener("click", () => { activeCat = p.dataset.cat; renderFilters(); renderMenu(); })
+      );
+    }
+
+    function renderMenu() {
+      const list = MENU.filter(m => {
+        if (activeCat !== "all" && m.category !== activeCat) return false;
+        if (vegOnly && !m.veg) return false;
+        if (query && !(`${m.name} ${m.description}`.toLowerCase().includes(query))) return false;
+        return true;
+      });
+      const el = document.getElementById("menuList");
+      if (!list.length) {
+        el.innerHTML = `<div class="empty">${App.icon("search",40)}<h3>No dishes found</h3><p>Try another search or category.</p></div>`;
+        return;
+      }
+      el.innerHTML = list.map(cardHTML).join("");
+      bindCards();
+    }
+
+    function cardHTML(m) {
+      const qty = Cart.qtyOf(m.id);
+      const soldout = m.stock <= 0;
+      const control = STORE_CLOSED
+        ? `<span class="stock-low">Closed</span>`
+        : soldout
+        ? `<span class="stock-low">Sold out</span>`
+        : qty > 0
+          ? `<div class="stepper" data-id="${m.id}">
+               <button data-act="dec">${App.icon("minus",16)}</button><b>${qty}</b>
+               <button data-act="inc">${App.icon("plus",16)}</button></div>`
+          : `<button class="add-btn" data-add="${m.id}">${App.icon("plus",15)} Add</button>`;
+      return `
+      <div class="dish card ${soldout ? "soldout" : ""}">
+        <img class="dish-img" src="${m.image}" alt="${m.name}" loading="lazy" onerror="App.imgFallback(this)" />
+        <div class="dish-body">
+          <div class="dish-top">
+            <span class="veg-dot ${m.veg ? "veg" : "nonveg"}"></span>
+            <span class="dish-name">${m.name}</span>
+            <span class="dish-rating">${App.icon("star",13)} ${m.rating}</span>
+          </div>
+          <p class="dish-desc">${m.description}</p>
+          <div class="dish-foot">
+            <span class="price">${App.money(m.price)} ${m.stock > 0 && m.stock <= 10 ? `<small>· only ${m.stock} left</small>` : ""}</span>
+            ${control}
+          </div>
+        </div>
+      </div>`;
+    }
+
+    /* ---- Identity gate: first "Add" ever asks for name + phone, then
+       proceeds straight to the cart (as requested). After that, adding
+       more items just adds silently — no repeat interruptions. ---- */
+    const gateBack = document.getElementById("gateBack");
+    let pendingAddId = null;
+    function openGate(itemId) {
+      pendingAddId = itemId;
+      const known = App.getCustomer();
+      if (known) { document.getElementById("gateName").value = known.name; document.getElementById("gatePhone").value = known.phone; }
+      gateBack.style.display = "flex";
+    }
+    document.getElementById("gateForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = document.getElementById("gateName").value.trim();
+      const phone = document.getElementById("gatePhone").value.trim();
+      if (!name || phone.replace(/\D/g, "").length < 6) { App.toast("Enter your name and a valid phone number"); return; }
+      App.setCustomer({ name, phone });
+      gateBack.style.display = "none";
+      if (pendingAddId) { Cart.add(pendingAddId); pendingAddId = null; }
+      location.href = "cart.html";
+    });
+    gateBack.addEventListener("click", (e) => { if (e.target === gateBack) gateBack.style.display = "none"; });
+
+    function bindCards() {
+      document.querySelectorAll("[data-add]").forEach(b =>
+        b.addEventListener("click", () => {
+          if (STORE_CLOSED) { App.toast("This restaurant is currently closed for new orders"); return; }
+          if (!App.getCustomer()) { openGate(b.dataset.add); return; }
+          Cart.add(b.dataset.add); App.toast("Added to cart"); renderMenu();
+        }));
+      document.querySelectorAll(".stepper").forEach(s => {
+        const id = s.dataset.id;
+        s.querySelector('[data-act="inc"]').addEventListener("click", () => { Cart.setQty(id, Cart.qtyOf(id) + 1); renderMenu(); });
+        s.querySelector('[data-act="dec"]').addEventListener("click", () => { Cart.setQty(id, Cart.qtyOf(id) - 1); renderMenu(); });
+      });
+    }
+
+    function renderCartBar() {
+      const bar = document.getElementById("cartbar");
+      const c = Cart.count();
+      if (c > 0) {
+        bar.classList.remove("hidden");
+        document.getElementById("cartCount").textContent = `${c} item${c > 1 ? "s" : ""}`;
+        document.getElementById("cartTotal").textContent = App.money(Cart.subtotal());
+      } else bar.classList.add("hidden");
+    }
+
+    document.getElementById("search").addEventListener("input", e => { query = e.target.value.toLowerCase().trim(); renderMenu(); });
+    document.getElementById("vegOnly").addEventListener("change", e => { vegOnly = e.target.checked; renderMenu(); });
+    document.addEventListener("cart:change", renderCartBar);
+
+    async function main() {
+      try {
+        const data = await Api.loadPublic();
+        CATEGORIES = data.categories;
+        MENU = data.menu;
+        STORE_CLOSED = !!data.tenant.isClosed;
+        document.getElementById("brand").innerHTML = App.brandBar({ back: "index.html", subtitle: "Our Menu" });
+        if (STORE_CLOSED) {
+          document.getElementById("closedBanner").innerHTML = `
+            <div class="section" style="padding-bottom:0">
+              <div class="card" style="padding:16px;display:flex;align-items:center;gap:12px;background:#fff8ec;border-color:#fbe4bd">
+                <span style="color:#b45309">${App.icon("lock",22)}</span>
+                <div><b style="font-size:13.5px">This restaurant is currently closed</b><br>
+                <small style="color:var(--muted)">You can browse the menu, but new orders can't be placed right now. You can still view your <a href="orders.html" style="color:var(--green-700);font-weight:600">past orders</a>.</small></div>
+              </div>
+            </div>`;
+        }
+        renderFilters();
+        renderMenu();
+        renderCartBar();
+        App.mountBottomNav("menu");
+      } catch (e) {
+        document.getElementById("menuList").innerHTML =
+          `<div class="empty">${App.icon("alert",40)}<h3>Can't load the menu</h3><p>Please check your connection and try again.</p></div>`;
+      }
+    }
+    main();
+  </script>
+</body>
+</html>

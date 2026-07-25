@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tables &amp; QR — Restaurant Admin</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+  <style>
+    .qr-toolbar { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:24px; }
+    .qr-toolbar .field { margin-bottom:0; flex:1; min-width:240px; }
+    .qr-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:18px; }
+    .qr-card { padding:18px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px; }
+    .qr-card .qtitle { font-family:var(--serif); font-size:18px; font-weight:600; }
+    .qr-card .qframe { background:#fff; border-radius:16px; padding:12px; border:1px solid var(--line); }
+    .qr-card .qurl { font-size:11px; color:var(--muted); word-break:break-all; line-height:1.35; }
+    .qr-card .qacts { display:flex; gap:8px; width:100%; }
+    .qr-card .qacts .btn { flex:1; padding:9px; font-size:13px; }
+    @media print {
+      body { background:#fff; }
+      .no-print { display:none !important; }
+      .dash-main { padding:0; }
+      .qr-grid { grid-template-columns:repeat(3,1fr); gap:10px; }
+      .qr-card { border:1px solid #ddd; box-shadow:none; break-inside:avoid; }
+      .qacts { display:none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dash">
+    <aside class="sidebar no-print" id="sidebar"></aside>
+    <main class="dash-main">
+      <nav class="mobile-nav no-print" id="mobileNav"></nav>
+      <div class="dash-head no-print" id="topbar"></div>
+
+      <div class="view-head no-print">
+        <p>Live table occupancy plus a printable QR for every table. Guests scan → menu opens with their table pre-filled.</p>
+        <div class="actions"><button class="btn btn-ghost" id="printBtn">Print all</button></div>
+      </div>
+
+      <div class="panel card no-print" id="addTablePanel" style="margin-bottom:22px; display:none">
+        <div class="panel-head"><h3>Add new table</h3></div>
+        <form class="add-table-bar" id="addTableForm">
+          <input class="input" id="newTableNum" type="number" min="1" placeholder="Table number, e.g. 13" required />
+          <button class="btn" type="submit">+ Add table &amp; generate QR</button>
+        </form>
+      </div>
+
+      <div class="panel card no-print" style="margin-bottom:22px">
+        <div class="panel-head"><h3>Table floor plan</h3><span class="link" id="occText"></span></div>
+        <div class="tables-grid" id="tablesGrid"></div>
+      </div>
+
+      <div class="card no-print" style="padding:18px; margin-bottom:22px">
+        <div class="qr-toolbar">
+          <div class="field">
+            <label for="baseUrl">Menu base URL (where this app is hosted)</label>
+            <input class="input" id="baseUrl" />
+          </div>
+          <button class="btn btn-ghost" id="applyBtn">Update QR codes</button>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin:0">
+          Each QR encodes <code id="sample"></code> — the tenant &amp; table are embedded automatically, so the customer never types a table number.
+        </p>
+      </div>
+
+      <div class="qr-grid" id="qrGrid"></div>
+    </main>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/qrcode.js"></script>
+  <script>
+    let TABLES = [], SLUG = "";
+
+    function renderTablesGrid() {
+      const occ = TABLES.filter((t) => t.status === "occupied").length;
+      document.getElementById("occText").textContent = `${occ} occupied · ${TABLES.length - occ} free`;
+      document.getElementById("tablesGrid").innerHTML = TABLES.map((t) =>
+        `<div class="tbl-cell ${t.status}"><span class="tc-eyebrow">Table</span><b class="tc-num">${String(t.number).padStart(2,"0")}</b>
+          <span class="tc-seats">${t.seats} seats</span>
+          <span class="pill-badge ${t.status === "occupied" ? "occupied" : "free"}">${t.status === "occupied" ? "Occupied" : "Available"}</span></div>`).join("");
+    }
+
+    const baseInput = document.getElementById("baseUrl");
+    const defaultBase = new URL("menu.html", location.href).href;
+
+    function urlFor(table) {
+      const base = baseInput.value.trim() || defaultBase;
+      const join = base.includes("?") ? "&" : "?";
+      return `${base}${join}r=${SLUG}&table=${table}`;
+    }
+
+    function render() {
+      document.getElementById("sample").textContent = urlFor(1);
+      document.getElementById("qrGrid").innerHTML = TABLES.map((t) => {
+        const url = urlFor(t.number);
+        const svg = QR.toSVG(url, { width: 180, color: "#0a3d28" });
+        return `<div class="qr-card card">
+          <div class="qtitle">Table ${t.number}</div>
+          <div class="qframe" id="qf-${t.number}">${svg}</div>
+          <div class="qurl">${url}</div>
+          <div class="qacts no-print">
+            <button class="btn btn-ghost" data-png="${t.number}">PNG</button>
+            <a class="btn" href="${url}" target="_blank" rel="noopener">Open</a>
+          </div>
+        </div>`;
+      }).join("");
+      document.querySelectorAll("[data-png]").forEach((b) =>
+        b.addEventListener("click", () => downloadPNG(b.dataset.png)));
+    }
+
+    // Rasterise the inline SVG to a PNG download (fully offline).
+    function downloadPNG(tableId) {
+      const svgEl = document.querySelector(`#qf-${tableId} svg`);
+      const xml = new XMLSerializer().serializeToString(svgEl);
+      const img = new Image();
+      const scale = 6;
+      img.onload = () => {
+        const size = svgEl.viewBox.baseVal.width * scale;
+        const cv = document.createElement("canvas");
+        cv.width = cv.height = size;
+        const ctx = cv.getContext("2d");
+        ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, size, size);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, 0, 0, size, size);
+        cv.toBlob((blob) => {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = `${SLUG}-table-${tableId}-qr.png`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        });
+      };
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
+    }
+
+    document.getElementById("applyBtn").addEventListener("click", () => { render(); App.toast("QR codes updated"); });
+    document.getElementById("printBtn").addEventListener("click", () => window.print());
+
+    document.getElementById("addTableForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const number = Number(document.getElementById("newTableNum").value);
+      try {
+        await Api.addTable({ number, seats: 4 });
+        App.toast(`Table ${number} added`);
+        document.getElementById("newTableNum").value = "";
+        TABLES = await Api.getTables();
+        renderTablesGrid();
+        render();
+      } catch (e2) { App.toast(e2.message); }
+    });
+
+    async function main() {
+      const authData = await Api.requireAuth();   // owner + manager + waiter can view tables & QR
+      if (!authData) return;
+      App.mountSidebar("sidebar", "tables");
+      App.mountMobileNav("mobileNav", "tables");
+      App.mountTopbar("topbar", "Tables & QR", async () => { TABLES = await Api.getTables(); renderTablesGrid(); render(); App.toast("Refreshed"); });
+      if (["owner", "manager"].includes(authData.user.role)) document.getElementById("addTablePanel").style.display = "block";
+      SLUG = authData.tenant.slug;
+      baseInput.value = defaultBase;
+      TABLES = await Api.getTables();
+      renderTablesGrid();
+      render();
+    }
+    main();
+  </script>
+</body>
+</html>

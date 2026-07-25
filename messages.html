@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Send Message — Restaurant Admin</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div class="dash">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="dash-main">
+      <nav class="mobile-nav" id="mobileNav"></nav>
+      <div class="dash-head" id="topbar"></div>
+
+      <div class="view-head">
+        <p id="custSummary">Loading customers…</p>
+        <div class="actions">
+          <div class="tt-search" style="min-width:200px"><span id="searchIco"></span><input id="custSearch" placeholder="Search name or phone…" autocomplete="off" /></div>
+        </div>
+      </div>
+
+      <div class="panel card" style="margin-bottom:20px">
+        <div class="panel-head"><h3>Compose message</h3></div>
+        <div class="msg-compose">
+          <textarea id="msgText" placeholder="Hi {name}, we miss you at The Food House! Come try our new menu this week 🍽️">Hi {name}, thanks for ordering with us! We'd love to see you again soon 🍽️</textarea>
+          <p class="msg-hint">Use <code>{name}</code> — it's replaced with each customer's own name automatically.</p>
+        </div>
+      </div>
+
+      <div class="panel card">
+        <div class="panel-head">
+          <h3>Customers</h3>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="link" id="selCount">0 selected</span>
+            <button class="btn btn-orange" id="bulkSendBtn" disabled>Send to selected</button>
+          </div>
+        </div>
+        <div class="bulk-progress" id="bulkProgress">
+          <span class="txt" id="bulkText"></span>
+          <button class="btn btn-ghost" id="bulkSkip" style="padding:8px 14px">Skip</button>
+          <button class="btn" id="bulkNext" style="padding:8px 14px">Sent → Next</button>
+          <button class="btn btn-ghost" id="bulkStop" style="padding:8px 14px">Stop</button>
+        </div>
+        <div class="table-scroll" style="margin-top:14px">
+          <table class="ctable" id="custTable"></table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    let CUSTOMERS = [], query = "";
+    const selected = new Set();
+
+    function waLinkFor(cust) {
+      const text = document.getElementById("msgText").value.replace(/\{name\}/g, cust.name || "there");
+      return `https://wa.me/${(cust.phone || "").replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
+    }
+
+    function renderTable() {
+      const list = CUSTOMERS.filter((c) =>
+        !query || (c.name || "").toLowerCase().includes(query) || (c.phone || "").includes(query));
+      document.getElementById("custSummary").textContent = `${CUSTOMERS.length} customer${CUSTOMERS.length === 1 ? "" : "s"} have ordered with you`;
+      document.getElementById("custTable").innerHTML = `
+        <thead><tr>
+          <th><input type="checkbox" id="selectAll" ${list.length && list.every((c) => selected.has(c.phone)) ? "checked" : ""}></th>
+          <th>Name</th><th>Phone</th><th>Orders</th><th>Total spent</th><th>Last visit</th><th></th>
+        </tr></thead>
+        <tbody>${list.map((c) => `
+          <tr>
+            <td><input type="checkbox" class="rowChk" data-phone="${c.phone}" ${selected.has(c.phone) ? "checked" : ""}></td>
+            <td><b>${c.name || "Guest"}</b></td>
+            <td>${c.phone}</td>
+            <td>${c.orderCount}</td>
+            <td style="font-weight:700">${App.money(c.totalSpent)}</td>
+            <td style="color:var(--muted)">${App.timeAgo(c.lastVisit)}</td>
+            <td><a class="cust-send" href="${waLinkFor(c)}" target="_blank" rel="noopener">${App.icon("whatsapp", 14)} Message</a></td>
+          </tr>`).join("") || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:30px">No customers yet — they'll appear here after their first order.</td></tr>`}
+        </tbody>`;
+      document.getElementById("selectAll")?.addEventListener("change", (e) => {
+        list.forEach((c) => { if (e.target.checked) selected.add(c.phone); else selected.delete(c.phone); });
+        renderTable();
+      });
+      document.querySelectorAll(".rowChk").forEach((chk) =>
+        chk.addEventListener("change", () => { if (chk.checked) selected.add(chk.dataset.phone); else selected.delete(chk.dataset.phone); updateSelCount(); }));
+      updateSelCount();
+    }
+
+    function updateSelCount() {
+      document.getElementById("selCount").textContent = `${selected.size} selected`;
+      document.getElementById("bulkSendBtn").disabled = selected.size === 0;
+    }
+
+    // Re-render the wa.me links whenever the message text changes (so the
+    // {name} substitution / edited text is always reflected before sending).
+    document.getElementById("msgText").addEventListener("input", () => renderTable());
+    document.getElementById("custSearch").addEventListener("input", (e) => { query = e.target.value.toLowerCase().trim(); renderTable(); });
+
+    /* ---- Guided bulk send ----
+       WhatsApp deliberately has no "send to many numbers instantly" API for
+       personal accounts (that's how it stops spam) — true one-click blasting
+       needs the paid, Meta-approved WhatsApp Business API. This is the honest
+       alternative: open each customer's chat pre-filled, one at a time, and
+       you just tap Send in WhatsApp before moving to the next. */
+    let bulkQueue = [], bulkIndex = 0;
+    document.getElementById("bulkSendBtn").addEventListener("click", () => {
+      bulkQueue = CUSTOMERS.filter((c) => selected.has(c.phone));
+      bulkIndex = 0;
+      document.getElementById("bulkProgress").classList.add("show");
+      stepBulk();
+    });
+    function stepBulk() {
+      if (bulkIndex >= bulkQueue.length) { endBulk(); return; }
+      const c = bulkQueue[bulkIndex];
+      document.getElementById("bulkText").textContent = `${bulkIndex + 1} of ${bulkQueue.length} — opening WhatsApp for ${c.name || c.phone}…`;
+      window.open(waLinkFor(c), "_blank", "noopener");
+    }
+    document.getElementById("bulkNext").addEventListener("click", () => { bulkIndex++; stepBulk(); });
+    document.getElementById("bulkSkip").addEventListener("click", () => { bulkIndex++; stepBulk(); });
+    document.getElementById("bulkStop").addEventListener("click", endBulk);
+    function endBulk() {
+      document.getElementById("bulkProgress").classList.remove("show");
+      App.toast(bulkIndex >= bulkQueue.length ? "Bulk send complete" : "Bulk send stopped");
+    }
+
+    async function main() {
+      const authData = await Api.requireAuth(["owner", "manager"]);
+      if (!authData) return;
+      App.mountSidebar("sidebar", "messages");
+      App.mountMobileNav("mobileNav", "messages");
+      App.mountTopbar("topbar", "Send Message", async () => { CUSTOMERS = await Api.getCustomers(); renderTable(); App.toast("Refreshed"); });
+      document.getElementById("searchIco").innerHTML = App.icon("search", 16);
+      CUSTOMERS = await Api.getCustomers();
+      renderTable();
+    }
+    main();
+  </script>
+</body>
+</html>

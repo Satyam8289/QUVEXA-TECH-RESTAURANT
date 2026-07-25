@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Order (POS) — The Food House</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+  <style>
+    .pos { display:grid; grid-template-columns:1.6fr 1fr; gap:20px; align-items:start; }
+    .pos-menu-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+    .pos-item { padding:12px; text-align:left; cursor:pointer; border:1px solid var(--line); background:var(--white); border-radius:var(--radius-sm); transition:.12s; }
+    .pos-item:hover { border-color:var(--green-600); box-shadow:var(--shadow-sm); transform:translateY(-1px); }
+    .pos-item:active { transform:scale(.98); }
+    .pos-item .pi-top { display:flex; align-items:center; gap:6px; }
+    .pos-item b { font-size:13.5px; display:block; margin:4px 0 2px; line-height:1.25; }
+    .pos-item .pi-price { font-weight:700; font-size:14px; }
+    .pos-item.out { opacity:.45; pointer-events:none; }
+    .pos-panel { position:sticky; top:20px; padding:18px; }
+    .pos-lines { display:flex; flex-direction:column; gap:10px; margin:14px 0; max-height:42vh; overflow:auto; }
+    .pos-line { display:flex; align-items:center; gap:10px; }
+    .pos-line .pl-name { flex:1; min-width:0; font-size:13.5px; }
+    .pos-line .pl-name small { color:var(--muted); display:block; font-size:11.5px; }
+    .pos-empty { text-align:center; color:var(--muted); padding:28px 10px; font-size:13px; }
+    .pos-filters { display:flex; gap:8px; overflow-x:auto; padding-bottom:12px; scrollbar-width:none; }
+    .pos-filters::-webkit-scrollbar { display:none; }
+    @media (max-width:900px){ .pos { grid-template-columns:1fr; } .pos-panel { position:static; } }
+  </style>
+</head>
+<body>
+  <div class="dash">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="dash-main">
+      <nav class="mobile-nav" id="mobileNav"></nav>
+      <div class="dash-head" id="topbar"></div>
+      <div class="view-head">
+        <p>Take orders for walk-in guests or anyone without a phone. Tap dishes to add.</p>
+        <div class="actions"><a class="btn btn-ghost" href="dashboard.html">← Dashboard</a></div>
+      </div>
+
+      <div class="pos">
+        <!-- Menu -->
+        <div class="panel card">
+          <div class="searchbar" style="margin:0 0 12px;position:relative">
+            <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted)" id="sIco"></span>
+            <input id="posSearch" placeholder="Search dishes…" style="width:100%;padding:11px 14px 11px 42px;border:1px solid var(--line);border-radius:14px;font:inherit" />
+          </div>
+          <div class="pos-filters" id="posFilters"></div>
+          <div class="pos-menu-grid" id="posMenu"></div>
+        </div>
+
+        <!-- Order panel -->
+        <div class="panel card pos-panel">
+          <div class="field" style="margin-bottom:12px">
+            <label>Table</label>
+            <select class="input" id="posTable"></select>
+          </div>
+          <div class="field" style="margin-bottom:12px">
+            <label>Customer name (optional)</label>
+            <input class="input" id="posName" placeholder="Walk-in guest" />
+          </div>
+          <div class="field" style="margin-bottom:12px">
+            <label>Phone (optional — for a bill / WhatsApp update)</label>
+            <input class="input" id="posPhone" placeholder="No phone? Leave blank" type="tel" />
+          </div>
+
+          <div style="font-weight:700;font-size:13px;color:var(--muted)">Order items</div>
+          <div class="pos-lines" id="posLines"></div>
+
+          <div class="summary" style="padding:0">
+            <div class="row"><span>Subtotal</span><span id="posSub">₹0</span></div>
+            <div class="row"><span>GST (5%)</span><span id="posGst">₹0</span></div>
+            <div class="row total"><span>Total</span><span id="posTotal">₹0</span></div>
+          </div>
+
+          <div class="field" style="margin:14px 0 12px">
+            <label>Payment</label>
+            <div class="pay-methods" id="posPay">
+              <button type="button" class="pay active" data-pay="Cash"><span class="pay-ico">◎</span>Cash</button>
+              <button type="button" class="pay" data-pay="UPI"><span class="pay-ico">₹</span>UPI</button>
+              <button type="button" class="pay" data-pay="Card"><span class="pay-ico">▭</span>Card</button>
+            </div>
+          </div>
+
+          <button class="btn btn-block btn-lg" id="posPlace">Place Order</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.getElementById("sIco").innerHTML = App.icon("search",18);
+
+    let CATS = [], MENU = [], TABLES = [];
+    let activeCat = "all", query = "", method = "Cash";
+    const order = {}; // id -> qty
+
+    // Filters
+    function renderFilters() {
+      const cats = [{ slug: "all", name: "All" }, ...CATS];
+      document.getElementById("posFilters").innerHTML = cats.map((c) => `<button class="pill ${activeCat === c.slug ? "active" : ""}" data-cat="${c.slug}">${c.name}</button>`).join("");
+      document.querySelectorAll("#posFilters .pill").forEach((p) => p.addEventListener("click", () => { activeCat = p.dataset.cat; renderFilters(); renderMenu(); }));
+    }
+
+    function renderMenu() {
+      const list = MENU.filter((m) => {
+        if (activeCat !== "all" && m.category !== activeCat) return false;
+        if (query && !m.name.toLowerCase().includes(query)) return false;
+        return true;
+      });
+      document.getElementById("posMenu").innerHTML = list.map((m) => `
+        <button class="pos-item ${m.stock <= 0 ? "out" : ""}" data-add="${m.id}">
+          <div class="pi-top"><span class="veg-dot ${m.veg ? "veg" : "nonveg"}"></span></div>
+          <b>${m.name}</b>
+          <div class="pi-price">${App.money(m.price)}${order[m.id] ? ` · <span style="color:var(--green-700)">×${order[m.id]}</span>` : ""}</div>
+        </button>`).join("");
+      document.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => { order[b.dataset.add] = (order[b.dataset.add] || 0) + 1; renderMenu(); renderOrder(); }));
+    }
+
+    function lines() {
+      return Object.entries(order).filter(([, q]) => q > 0).map(([id, qty]) => {
+        const m = MENU.find((x) => x.id === id); return { id, name: m.name, price: m.price, qty };
+      });
+    }
+    const sub = () => lines().reduce((s, l) => s + l.price * l.qty, 0);
+    const gst = () => Math.round(sub() * 0.05);
+    const total = () => sub() + gst();
+
+    function renderOrder() {
+      const ls = lines();
+      const el = document.getElementById("posLines");
+      el.innerHTML = ls.length ? ls.map((l) => `
+        <div class="pos-line">
+          <div class="pl-name">${l.name}<small>${App.money(l.price)}</small></div>
+          <div class="stepper" data-id="${l.id}">
+            <button data-act="dec">${App.icon("minus",15)}</button><b>${l.qty}</b>
+            <button data-act="inc">${App.icon("plus",15)}</button>
+          </div>
+          <div style="font-weight:700;min-width:56px;text-align:right">${App.money(l.price * l.qty)}</div>
+        </div>`).join("") : `<div class="pos-empty">No items yet — tap dishes on the left.</div>`;
+      el.querySelectorAll(".stepper").forEach((s) => {
+        const id = s.dataset.id;
+        s.querySelector('[data-act="inc"]').addEventListener("click", () => { order[id]++; renderMenu(); renderOrder(); });
+        s.querySelector('[data-act="dec"]').addEventListener("click", () => { order[id] = Math.max(0, order[id] - 1); renderMenu(); renderOrder(); });
+      });
+      document.getElementById("posSub").textContent = App.money(sub());
+      document.getElementById("posGst").textContent = App.money(gst());
+      document.getElementById("posTotal").textContent = App.money(total());
+    }
+
+    document.getElementById("posSearch").addEventListener("input", (e) => { query = e.target.value.toLowerCase().trim(); renderMenu(); });
+    document.querySelectorAll("#posPay .pay").forEach((p) => p.addEventListener("click", () => {
+      document.querySelectorAll("#posPay .pay").forEach((x) => x.classList.remove("active"));
+      p.classList.add("active"); method = p.dataset.pay;
+    }));
+
+    document.getElementById("posPlace").addEventListener("click", async () => {
+      const ls = lines();
+      if (!ls.length) { App.toast("Add at least one item"); return; }
+      const table = Number(document.getElementById("posTable").value) || null;
+      const name = document.getElementById("posName").value.trim() || "Walk-in guest";
+      const phone = document.getElementById("posPhone").value.trim() || "counter";
+      try {
+        const placed = await Api.createOrder({
+          table, customer: name, phone, method,
+          items: ls.map((l) => ({ id: l.id, name: l.name, qty: l.qty, price: l.price })),
+        });
+        App.toast(`Order ${placed.code} placed${table ? ` for Table ${table}` : ""}`);
+        Object.keys(order).forEach((k) => delete order[k]);
+        document.getElementById("posName").value = "";
+        document.getElementById("posPhone").value = "";
+        if (table) { const t = TABLES.find((x) => x.number === table); if (t) t.status = "occupied"; }
+        document.getElementById("posTable").innerHTML =
+          TABLES.map((t) => `<option value="${t.number}">Table ${t.number}${t.status === "occupied" ? " (occupied)" : ""}</option>`).join("");
+        renderMenu(); renderOrder();
+      } catch (e) { App.toast(e.message); }
+    });
+
+    async function main() {
+      const authData = await Api.requireAuth();   // owner + manager + waiter can take orders
+      if (!authData) return;
+      App.mountSidebar("sidebar", "pos");
+      App.mountMobileNav("mobileNav", "pos");
+      App.mountTopbar("topbar", "New Order");
+      [CATS, MENU, TABLES] = await Promise.all([Api.getCategories(), Api.getMenu(), Api.getTables()]);
+      document.getElementById("posTable").innerHTML =
+        TABLES.map((t) => `<option value="${t.number}">Table ${t.number}${t.status === "occupied" ? " (occupied)" : ""}</option>`).join("");
+      renderFilters(); renderMenu(); renderOrder();
+    }
+    main();
+  </script>
+</body>
+</html>

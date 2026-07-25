@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>The Food House — Order from your table</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+</head>
+<body class="customer">
+  <div class="phone">
+    <header class="topbar">
+      <span class="brand-mark" id="mark"></span>
+      <div class="topbar-title">
+        <strong id="tname">The Food House</strong>
+        <small id="ttag">Modern Indian Kitchen</small>
+      </div>
+      <a class="chip" href="orders.html">My Orders</a>
+    </header>
+
+    <section class="hero">
+      <div class="hero-bg">
+        <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=70" alt="Restaurant interior" onerror="App.imgFallback(this)" />
+      </div>
+      <div class="hero-inner">
+        <span class="eyebrow">QR Dine-in · Scan · Order</span>
+        <h1>Great food,<br>right from your table.</h1>
+        <p>Browse the menu, order in seconds and track it live — no waiting for a waiter.</p>
+        <div class="rating-row" id="hrating"></div>
+      </div>
+    </section>
+
+    <div class="table-picker">
+      <div class="field">
+        <label for="table">Your table number</label>
+        <input class="input" id="table" type="number" min="1" max="12" inputmode="numeric" placeholder="e.g. 4" />
+      </div>
+      <a class="btn btn-block btn-lg" id="viewMenu" href="menu.html">View Menu <span id="arrow"></span></a>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature card">
+        <span id="f1"></span><strong>Live Tracking</strong><small>Kitchen to table</small>
+      </div>
+      <div class="feature card">
+        <span id="f2"></span><strong>WhatsApp</strong><small>Instant updates</small>
+      </div>
+      <div class="feature card">
+        <span id="f3"></span><strong>UPI · Card · Cash</strong><small>Pay your way</small>
+      </div>
+    </div>
+
+    <div class="section" style="padding-top:0">
+      <div class="card" style="padding:16px;display:flex;align-items:center;gap:12px">
+        <span id="pin" style="color:var(--green-700)"></span>
+        <div style="flex:1"><b style="font-size:13px" id="addr"></b><br><small style="color:var(--muted)">Open today · 11:00 AM – 11:00 PM</small></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.getElementById("arrow").innerHTML   = App.icon("back", 18, "flip");
+    document.getElementById("hrating").innerHTML = `${App.icon("star",15)} 4.8 · 2,400+ ratings · Pure veg options`;
+    document.getElementById("f1").innerHTML = App.icon("clock", 22);
+    document.getElementById("f2").innerHTML = App.icon("whatsapp", 22);
+    document.getElementById("f3").innerHTML = App.icon("revenue", 22);
+    document.getElementById("pin").innerHTML = App.icon("pin", 22);
+    document.querySelectorAll(".flip").forEach(s => s.style.transform = "rotate(180deg)");
+
+    // Table number
+    const tableInput = document.getElementById("table");
+    tableInput.value = App.getTableNo();
+    tableInput.addEventListener("input", () => { App.setTableNo(tableInput.value); App.setTableLocked(false); });
+    document.getElementById("viewMenu").addEventListener("click", () => {
+      if (tableInput.value) App.setTableNo(tableInput.value);
+    });
+
+    async function main() {
+      try {
+        const data = await Api.loadPublic();
+        const mark = document.getElementById("mark");
+        if (data.tenant.logo) { mark.classList.add("has-logo"); mark.innerHTML = `<img src="${data.tenant.logo}" alt="logo">`; }
+        else mark.innerHTML = App.icon("leaf", 20);
+        document.getElementById("tname").textContent = data.tenant.name;
+        document.getElementById("ttag").textContent  = data.tenant.tagline || "";
+        document.getElementById("addr").textContent  = data.tenant.address || "";
+      } catch (e) {
+        App.toast("Can't reach the restaurant server. Please check your connection.");
+      }
+    }
+    main();
+  </script>
+</body>
+</html>

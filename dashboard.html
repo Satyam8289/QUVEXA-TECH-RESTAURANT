@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Restaurant Admin</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+  <style>
+    .icon-btn.danger:hover { background: var(--danger-50); color: var(--danger); }
+    .skeleton { display: flex; align-items: center; justify-content: center; padding: 80px 20px; color: var(--muted); font-size: 14px; gap: 10px; }
+    .spin { width: 18px; height: 18px; border: 2.5px solid var(--green-100); border-top-color: var(--green-700); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .staff-card { padding: 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: box-shadow .15s, border-color .15s; }
+    .staff-card:hover { border-color: var(--green-600); box-shadow: var(--shadow-sm); }
+    .staff-card .role-pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--green-50); color: var(--green-800); text-transform: capitalize; }
+    #tbSearch { pointer-events: none; opacity: .7; } /* visual only for now */
+    .session-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; margin-bottom: 18px; }
+    .session-bar.past { background: #fff8ec; border-color: #fbe4bd; }
+    .session-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+    .session-bar select { font: inherit; font-size: 13px; font-weight: 600; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--cream); color: var(--ink); }
+    .session-readonly { font-size: 11.5px; font-weight: 700; color: #b45309; background: #fff4e0; padding: 4px 10px; border-radius: 999px; }
+  </style>
+</head>
+<body>
+  <div class="dash">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="dash-main">
+      <nav class="mobile-nav" id="mobileNav"></nav>
+      <div class="dash-head" id="topbar"></div>
+      <div id="sessionBar"></div>
+      <div id="view"><div class="skeleton"><span class="spin"></span> Loading…</div></div>
+    </main>
+  </div>
+
+  <!-- Staff modal: shows username + lets the owner set a new password
+       (bcrypt hashes can't be reversed — resetting is the secure pattern) -->
+  <div class="modal-back" id="staffModalBack">
+    <div class="modal card" id="staffModal"></div>
+  </div>
+
+  <!-- Add-table modal (also reachable from the Tables & QR page) -->
+  <div class="modal-back" id="tableModalBack">
+    <form class="modal card" id="tableModal">
+      <h3>Add a table</h3>
+      <div class="field"><label>Table number</label><input class="input" id="newTableNum" type="number" min="1" required /></div>
+      <div class="field" style="margin-bottom:0"><label>Seats</label><input class="input" id="newTableSeats" type="number" min="1" value="4" required /></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="tableModalCancel" style="flex:1">Cancel</button>
+        <button type="submit" class="btn" style="flex:1">Add table</button>
+      </div>
+    </form>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const view = document.getElementById("view");
+    const STATUSES = ["pending", "preparing", "ready", "served"];
+    const catName = (id) => (CATS.find((c) => c.slug === id) || {}).name || id;
+    const dateStr = () => new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    const viewHead = (sub, actions = "") => `<div class="view-head"><p>${sub}</p><div class="actions">${actions}</div></div>`;
+    const formatDateTime = (iso) => new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
+    const receiptLink = (code) => `bill.html?code=${encodeURIComponent(code)}&r=${SLUG}`;
+
+    /* ---- Date-range filter, shared by Live Orders and Payments ---- */
+    const DATE_RANGES = [["all", "All time"], ["today", "Today"], ["yesterday", "Yesterday"], ["week", "This week"], ["month", "This month"]];
+    function dateRangeFilterHTML(active, fnName) {
+      return `<div class="filters" style="padding:0 0 12px">` + DATE_RANGES.map(([k, l]) =>
+        `<button class="pill ${active === k ? "active" : ""}" data-dr="${k}" data-drfn="${fnName}">${l}</button>`).join("") + `</div>`;
+    }
+    function filterByDateRange(orders, key) {
+      if (key === "all") return orders;
+      const now = new Date();
+      const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (key === "today") return orders.filter((o) => new Date(o.createdAt) >= startToday);
+      if (key === "yesterday") {
+        const y0 = new Date(startToday); y0.setDate(y0.getDate() - 1);
+        return orders.filter((o) => { const t = new Date(o.createdAt); return t >= y0 && t < startToday; });
+      }
+      if (key === "week") {
+        const w0 = new Date(startToday); w0.setDate(w0.getDate() - startToday.getDay());
+        return orders.filter((o) => new Date(o.createdAt) >= w0);
+      }
+      if (key === "month") {
+        const m0 = new Date(now.getFullYear(), now.getMonth(), 1);
+        return orders.filter((o) => new Date(o.createdAt) >= m0);
+      }
+      return orders;
+    }
+    function bindDateRangeFilters() {
+      view.querySelectorAll("[data-dr]").forEach((p) => p.addEventListener("click", () => {
+        if (p.dataset.drfn === "orders") { ordersDateFilter = p.dataset.dr; renderOrders(); }
+        else { payDateFilter = p.dataset.dr; renderPayments(); }
+      }));
+    }
+
+    /* ---------- in-memory cache, loaded from the backend ---------- */
+    let MENU = [], ORDERS = [], TABLES = [], CATS = [], STATS = {};
+    let overviewChartFilter = "today", analyticsChartFilter = "today";
+    function bindChartFilters() {
+      view.querySelectorAll("[data-chartf]").forEach((p) => p.addEventListener("click", () => {
+        if (p.dataset.fn === "overview") { overviewChartFilter = p.dataset.chartf; renderOverview(); }
+        else { analyticsChartFilter = p.dataset.chartf; renderAnalytics(); }
+      }));
+    }
+
+    /* ---------- Sessions (financial years) ----------
+       Orders/payments/analytics are scoped to whichever session is being
+       viewed. Menu, stock, staff and Send Message data are NOT session-
+       scoped — Api.getMenu()/getCustomers()/getStaff() never take a session. */
+    let SESSIONS = [], viewSessionId = null;
+    function isViewingPastSession() {
+      const s = SESSIONS.find((x) => x.id === viewSessionId);
+      return !!(s && !s.isActive);
+    }
+    function nextFYName() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const startYear = now.getMonth() >= 3 ? y + 1 : y; // suggest the NEXT year's FY
+      return `FY ${startYear}-${startYear + 1}`;
+    }
+    async function loadSessions() {
+      SESSIONS = await Api.getSessions();
+      if (!viewSessionId || !SESSIONS.some((s) => s.id === viewSessionId)) {
+        const active = SESSIONS.find((s) => s.isActive);
+        viewSessionId = active ? active.id : (SESSIONS[0] && SESSIONS[0].id);
+      }
+    }
+    function renderSessionBar() {
+      const el = document.getElementById("sessionBar");
+      const role = (App.currentUser() || { role: "owner" }).role;
+      // Waiters only ever work in the current financial year — no switcher for them.
+      if (!el || !SESSIONS.length || role === "waiter") { if (el) el.innerHTML = ""; return; }
+      const past = isViewingPastSession();
+      el.innerHTML = `<div class="session-bar ${past ? "past" : ""}">
+        <span class="session-label">${App.icon("clock", 15)} Financial year</span>
+        <select id="sessionSelect">${SESSIONS.map((s) => `<option value="${s.id}" ${s.id === viewSessionId ? "selected" : ""}>${s.name}${s.isActive ? " (current)" : ""}</option>`).join("")}</select>
+        ${past ? `<span class="session-readonly">Past year — read only</span>` : ""}
+        ${role === "owner" ? `<button class="btn btn-ghost" id="newSessionBtn" style="padding:8px 14px;font-size:12.5px;margin-left:auto">+ Start new financial year</button>` : ""}
+      </div>`;
+      document.getElementById("sessionSelect").addEventListener("change", async (e) => {
+        viewSessionId = e.target.value;
+        renderSessionBar();
+        await loadCore();
+        route();
+      });
+      const newBtn = document.getElementById("newSessionBtn");
+      if (newBtn) newBtn.addEventListener("click", async () => {
+        const name = prompt("Name this new financial year (menu, stock & customers carry over automatically):", nextFYName());
+        if (!name) return;
+        try {
+          const s = await Api.createSession(name);
+          App.toast(`Started ${s.name}`);
+          await loadSessions();
+          viewSessionId = s.id;
+          renderSessionBar();
+          await loadCore();
+          route();
+        } catch (ex) { App.toast(ex.message); }
+      });
+    }
+
+    async function loadCore() {
+      [MENU, ORDERS, TABLES, CATS, STATS] = await Promise.all([
+        Api.getMenu(), Api.getOrders(viewSessionId), Api.getTables(), Api.getCategories(), Api.getStats(viewSessionId),
+      ]);
+      const lowStock = MENU.filter((m) => m.stock <= 10).length;
+      const pending = ORDERS.filter((o) => o.status === "pending").length;
+      App.setNotifDot(lowStock > 0 || pending > 0);
+    }
+
+    /* ---------- shared render helpers ---------- */
+    // Real sales series, computed from actual order timestamps — never fake
+    // placeholder numbers. "today" buckets by hour (11am–9pm); "7d"/"30d"
+    // bucket by calendar day.
+    const HOURS = ["11a","12p","1p","2p","3p","4p","5p","6p","7p","8p","9p"];
+    function computeSeries(period) {
+      if (period === "today") {
+        const start = new Date(); start.setHours(0, 0, 0, 0);
+        const buckets = new Array(HOURS.length).fill(0);
+        ORDERS.forEach((o) => {
+          const d = new Date(o.createdAt);
+          if (d < start) return;
+          const idx = Math.min(HOURS.length - 1, Math.max(0, d.getHours() - 11));
+          buckets[idx] += o.total;
+        });
+        return { labels: HOURS, values: buckets };
+      }
+      const days = period === "7d" ? 7 : 30;
+      const labels = [], values = [];
+      const now = new Date();
+      for (let i = days - 1; i >= 0; i--) {
+        const day = new Date(now); day.setDate(day.getDate() - i); day.setHours(0, 0, 0, 0);
+        const next = new Date(day); next.setDate(next.getDate() + 1);
+        const sum = ORDERS.filter((o) => { const t = new Date(o.createdAt); return t >= day && t < next; })
+          .reduce((s, o) => s + o.total, 0);
+        const showLabel = days === 7 || i % 5 === 0 || i === 0;
+        labels.push(showLabel ? day.toLocaleDateString("en-IN", days === 7 ? { weekday: "short" } : { day: "numeric", month: "short" }) : "");
+        values.push(sum);
+      }
+      return { labels, values };
+    }
+    function lineChartHTML(labels, values) {
+      const w = 100, h = 40;
+      const max = Math.max(1, ...values);
+      const stepX = labels.length > 1 ? w / (labels.length - 1) : 0;
+      const points = values.map((v, i) => [labels.length > 1 ? i * stepX : w / 2, h - (v / max) * (h - 6) - 3]);
+      const path = points.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+      const areaPath = points.length ? `${path} L${points[points.length - 1][0].toFixed(2)},${h} L${points[0][0].toFixed(2)},${h} Z` : "";
+      const dots = points.map(([x, y], i) => `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="1.6" class="lc-dot"><title>${values[i] ? App.money(values[i]) : "No sales"}</title></circle>`).join("");
+      return `<div class="linechart-wrap">
+        <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="linechart">
+          <defs><linearGradient id="lcFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#147a49" stop-opacity="0.28"/><stop offset="100%" stop-color="#147a49" stop-opacity="0"/>
+          </linearGradient></defs>
+          ${areaPath ? `<path d="${areaPath}" fill="url(#lcFill)" stroke="none"/>` : ""}
+          <path d="${path}" fill="none" stroke="#147a49" stroke-width="1" vector-effect="non-scaling-stroke"/>
+          ${dots}
+        </svg>
+        <div class="linechart-labels">${labels.map((l) => `<span>${l}</span>`).join("")}</div>
+      </div>`;
+    }
+    function chartFilterHTML(active, onclickFn) {
+      return `<div class="chart-filters">` + [["today", "Today"], ["7d", "7 Days"], ["30d", "30 Days"]].map(([k, l]) =>
+        `<button class="pill ${active === k ? "active" : ""}" data-chartf="${k}" data-fn="${onclickFn}">${l}</button>`).join("") + `</div>`;
+    }
+    function topItemsData() {
+      const c = {};
+      ORDERS.forEach((o) => o.items.forEach((it) => {
+        c[it.name] = c[it.name] || { qty: 0, rev: 0 };
+        c[it.name].qty += it.qty; c[it.name].rev += it.qty * it.price;
+      }));
+      return Object.entries(c).sort((a, b) => b[1].qty - a[1].qty);
+    }
+    function topItemsHTML(limit = 5) {
+      const top = topItemsData().slice(0, limit), max = top.length ? top[0][1].qty : 1;
+      return top.map(([name, d], i) =>
+        `<div class="list-row"><span class="rank">${i + 1}</span><div class="grow"><b>${name}</b><small>${d.qty} sold</small>
+          <div class="progress"><i style="width:${Math.round(d.qty / max * 100)}%"></i></div></div><span class="amt">${App.money(d.rev)}</span></div>`).join("")
+        || `<p style="color:var(--muted);font-size:13px">No sales yet.</p>`;
+    }
+    function payData(orders = ORDERS) {
+      const m = { UPI: 0, Card: 0, Cash: 0 };
+      orders.forEach((o) => { m[o.method] = (m[o.method] || 0) + o.total; });
+      return m;
+    }
+    function catData() {
+      const map = {};
+      ORDERS.forEach((o) => o.items.forEach((it) => {
+        const mi = MENU.find((x) => x.id === it.id) || MENU.find((x) => x.name === it.name);
+        const cat = mi ? mi.category : "other";
+        map[cat] = (map[cat] || 0) + it.qty * it.price;
+      }));
+      return map;
+    }
+    function hbars(entries) {
+      const max = Math.max(1, ...entries.map((e) => e[1]));
+      return entries.map(([label, val]) =>
+        `<div class="list-row"><div class="grow"><b>${label}</b><div class="progress"><i style="width:${Math.round(val / max * 100)}%"></i></div></div><span class="amt">${App.money(val)}</span></div>`).join("")
+        || `<p style="color:var(--muted);font-size:13px">No data yet.</p>`;
+    }
+    function tablesGridHTML() {
+      return `<div class="tables-grid">` + TABLES.map((t) =>
+        `<div class="tbl-cell ${t.status}"><span class="tc-eyebrow">Table</span><b class="tc-num">${String(t.number).padStart(2,"0")}</b>
+          <span class="tc-seats">${t.seats} seats</span>
+          <span class="pill-badge ${t.status === "occupied" ? "occupied" : "free"}">${t.status === "occupied" ? "Occupied" : "Available"}</span></div>`).join("") + `</div>`;
+    }
+    function lowStockHTML() {
+      const low = MENU.filter((m) => m.stock <= 10).sort((a, b) => a.stock - b.stock);
+      if (!low.length) return `<div class="alert-row ok">${App.icon("check", 16)} All items well stocked</div>`;
+      return low.map((m) => `<div class="alert-row ${m.stock <= 8 ? "" : "ok"}">${App.icon(m.stock <= 8 ? "alert" : "check", 16)} ${m.name}<span class="amt">${m.stock} left</span></div>`).join("");
+    }
+
+    /* Live orders table: Order # and Items are separate columns; a Payment
+       column shows the method — with a "Collect" action for uncollected
+       cash, or who collected it once it has been. */
+    function ordersTableHTML(filter = "all", limit = null, dateKey = "all") {
+      let orders = ORDERS;
+      if (filter !== "all") orders = orders.filter((o) => o.status === filter);
+      orders = filterByDateRange(orders, dateKey);
+      if (limit) orders = orders.slice(0, limit);
+      const rows = orders.map((o) => {
+        const items = o.items.map((i) => `${i.qty}× ${i.name}`).join(", ");
+        const opts = STATUSES.map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s[0].toUpperCase() + s.slice(1)}</option>`).join("");
+        const payCell = o.paymentCollected
+          ? (o.collectedBy ? `<span class="collected-by">${App.icon("check",13)} ${o.collectedBy}</span>` : `<span class="settled-tag">Settled</span>`)
+          : `<button class="collect-btn" data-collect="${o.id}">Collect ${App.money(o.total)}</button>`;
+        const phone = o.phone && o.phone !== "counter" ? o.phone : "";
+        return `<tr>
+          <td class="oid" data-label="Order #">${o.code}</td>
+          <td data-label="Customer"><b style="font-size:13px">${o.customer || "Guest"}</b>${phone ? `<br><small style="color:var(--muted)">${phone}</small>` : ""}</td>
+          <td class="oitems" data-label="Items" title="${items}">${items}</td>
+          <td data-label="Table">T${o.table ?? "—"}</td>
+          <td data-label="Date" style="color:var(--muted);font-size:12.5px;white-space:nowrap">${formatDateTime(o.createdAt)}</td>
+          <td data-label="Status"><span class="badge ${o.status}">${o.status}</span><br><select class="status-select" data-order="${o.id}" style="margin-top:5px">${opts}</select></td>
+          <td data-label="Payment"><span class="chip" style="margin-bottom:4px">${o.method}</span><br>${payCell}</td>
+          <td data-label="Amount" style="white-space:nowrap"><b>${App.money(o.total)}</b> <a class="icon-btn" href="${receiptLink(o.code)}" target="_blank" rel="noopener" title="View receipt" style="width:26px;height:26px;vertical-align:middle;margin-left:4px">${App.icon("clipboard",13)}</a></td>
+        </tr>`;
+      }).join("");
+      return `<table class="otable otable-responsive"><thead><tr><th>Order #</th><th>Customer</th><th>Items</th><th>Table</th><th>Date</th><th>Status</th><th>Payment</th><th>Amount</th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="8" style="color:var(--muted);padding:22px;text-align:center">No orders here</td></tr>`}</tbody></table>`;
+    }
+    function bindOrdersTable() {
+      document.querySelectorAll(".status-select").forEach((sel) =>
+        sel.addEventListener("change", async () => {
+          if (isViewingPastSession()) { App.toast("Switch to the current financial year to make changes"); renderOrders(); return; }
+          const code = ORDERS.find((o) => o.id === sel.dataset.order)?.code;
+          try {
+            await Api.updateOrderStatus(sel.dataset.order, sel.value);
+            App.toast(`${code} → ${sel.value}`);
+            await loadCore(); route();
+          } catch (e) { App.toast(e.message); }
+        }));
+      document.querySelectorAll("[data-collect]").forEach((b) =>
+        b.addEventListener("click", async () => {
+          if (isViewingPastSession()) { App.toast("Switch to the current financial year to make changes"); return; }
+          try {
+            const res = await Api.collectPayment(b.dataset.collect);
+            App.toast(`Payment collected by ${res.collectedBy}`);
+            await loadCore(); route();
+          } catch (e) { App.toast(e.message); }
+        }));
+    }
+
+    /* ---------- VIEWS ---------- */
+    function renderOverview() {
+      const s = STATS, nT = TABLES.length;
+      const role = (App.currentUser() || { role: "owner" }).role;
+      const isWaiter = role === "waiter";
+
+      // Waiters see operational counts only — no revenue, no averages,
+      // no sales chart or analytics. Owner/manager get the full picture.
+      const kpis = isWaiter
+        ? [
+            ["orange", "clipboard", ORDERS.filter((o) => o.status !== "served").length, "Live orders"],
+            ["amber", "alert", ORDERS.filter((o) => o.status === "pending").length, "Pending orders"],
+            ["blue", "floor", `${s.occupied}/${nT}`, "Occupied tables"],
+          ]
+        : [
+            ["kpi-hero", "revenue", App.money(s.revenue), "Revenue"],
+            ["orange", "clipboard", s.count, "Total orders"],
+            ["blue", "trend", App.money(s.avg), "Avg. order value"],
+            ["amber", "floor", `${s.occupied}/${nT}`, "Occupied tables"],
+          ];
+
+      const kpiGridStyle = isWaiter ? ` style="grid-template-columns:repeat(3,1fr)"` : "";
+      let html = viewHead(dateStr(), `<a class="btn btn-orange" href="pos.html">+ New Order</a>`)
+        + `<div class="kpi-grid"${kpiGridStyle}>` + kpis.map((k) =>
+            `<div class="kpi card ${k[0]}"><div class="kpi-ic">${App.icon(k[1], 20)}</div><div class="lbl">${k[3]}</div><div class="val">${k[2]}</div></div>`).join("") + `</div>`;
+
+      if (isWaiter) {
+        html += `<div class="dash-grid">
+            <div class="panel card"><div class="panel-head"><h3>Recent orders</h3><a class="link" href="dashboard.html#orders">View all</a></div><div class="table-scroll">${ordersTableHTML("all", 6)}</div></div>
+            <div class="panel card"><div class="panel-head"><h3>Low stock</h3><span class="link">Heads up</span></div>${lowStockHTML()}</div>
+          </div>
+          <div style="height:20px"></div>
+          <div class="panel card"><div class="panel-head"><h3>Tables</h3><a class="link" href="qr.html">QR codes</a></div>${tablesGridHTML()}</div>`;
+      } else {
+        html += `<div class="dash-grid">
+            <div class="panel card"><div class="panel-head"><h3>Recent orders</h3><a class="link" href="dashboard.html#orders">View all</a></div><div class="table-scroll">${ordersTableHTML("all", 6)}</div></div>
+            <div class="stack">
+              <div class="panel card"><div class="panel-head"><h3>Sales trend</h3>${chartFilterHTML(overviewChartFilter, "overview")}</div>${(({ labels, values }) => lineChartHTML(labels, values))(computeSeries(overviewChartFilter))}</div>
+              <div class="panel card"><div class="panel-head"><h3>Low stock</h3><a class="link" href="dashboard.html#stock">Manage</a></div>${lowStockHTML()}</div>
+            </div>
+          </div>
+          <div style="height:20px"></div>
+          <div class="dash-grid">
+            <div class="panel card"><div class="panel-head"><h3>Tables</h3><a class="link" href="qr.html">QR codes</a></div>${tablesGridHTML()}</div>
+            <div class="panel card"><div class="panel-head"><h3>Top selling</h3><span class="link">By qty</span></div>${topItemsHTML(5)}</div>
+          </div>`;
+      }
+      view.innerHTML = html;
+      bindOrdersTable();
+      bindChartFilters();
+    }
+
+    let ordersFilter = "all", ordersDateFilter = "all";
+    function renderOrders() {
+      const pills = ["all", ...STATUSES].map((f) =>
+        `<button class="pill ${f === ordersFilter ? "active" : ""}" data-filter="${f}">${f === "all" ? "All" : f[0].toUpperCase() + f.slice(1)}</button>`).join("");
+      view.innerHTML = viewHead("Update every order in real time — customers see changes instantly", `<a class="btn btn-orange" href="pos.html">+ New Order</a>`)
+        + dateRangeFilterHTML(ordersDateFilter, "orders")
+        + `<div class="filters" style="padding:0 0 16px">${pills}</div>`
+        + `<div class="panel card"><div class="table-scroll">${ordersTableHTML(ordersFilter, null, ordersDateFilter)}</div></div>`;
+      view.querySelectorAll("[data-filter]").forEach((p) => p.addEventListener("click", () => { ordersFilter = p.dataset.filter; renderOrders(); }));
+      bindOrdersTable();
+      bindDateRangeFilters();
+    }
+
+    let payFilter = "all", payPendingOnly = false, payDateFilter = "all";
+    function renderPayments() {
+      let orders = ORDERS;
+      if (payFilter !== "all") orders = orders.filter((o) => o.method === payFilter);
+      if (payPendingOnly) orders = orders.filter((o) => !o.paymentCollected);
+      orders = filterByDateRange(orders, payDateFilter);
+      const pd = payData(orders), total = Object.values(pd).reduce((a, b) => a + b, 0);
+      const methodCards = [["UPI", "card"], ["Card", "card"], ["Cash", "revenue"]].map(([k, ic]) =>
+        `<div class="kpi card"><div class="kpi-ic">${App.icon(ic, 20)}</div><div class="lbl">${k} collected</div><div class="val">${App.money(pd[k] || 0)}</div></div>`).join("");
+      const methodPills = ["all", "UPI", "Card", "Cash"].map((m) =>
+        `<button class="pill ${payFilter === m ? "active" : ""}" data-pf="${m}">${m === "all" ? "All methods" : m}</button>`).join("");
+      view.innerHTML = viewHead(`${orders.length} transaction${orders.length === 1 ? "" : "s"} · ${App.money(total)} collected`, "")
+        + `<div class="kpi-grid">
+            <div class="kpi card kpi-hero"><div class="kpi-ic">${App.icon("revenue", 20)}</div><div class="lbl">Total collected</div><div class="val">${App.money(total)}</div></div>
+            ${methodCards}</div>`
+        + dateRangeFilterHTML(payDateFilter, "payments")
+        + `<div class="filters" style="padding:0 0 12px">${methodPills}</div>`
+        + `<label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:16px;cursor:pointer">
+             <input type="checkbox" id="payPendingChk" ${payPendingOnly ? "checked" : ""} style="width:16px;height:16px"> Uncollected cash only</label>
+           <div class="panel card"><div class="panel-head"><h3>Transactions</h3></div><div class="table-scroll">
+            <table class="otable otable-responsive"><thead><tr><th>Order</th><th>Customer</th><th>Table</th><th>Method</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>`
+            + orders.map((o) => `<tr><td class="oid" data-label="Order">${o.code}</td><td data-label="Customer">${o.customer || "Guest"}</td><td data-label="Table">T${o.table ?? "—"}</td>
+                <td data-label="Method"><span class="chip">${o.method}</span></td><td data-label="Date" style="color:var(--muted);white-space:nowrap">${formatDateTime(o.createdAt)}</td>
+                <td data-label="Amount" style="white-space:nowrap"><b>${App.money(o.total)}</b> <a class="icon-btn" href="${receiptLink(o.code)}" target="_blank" rel="noopener" title="View receipt" style="width:26px;height:26px;vertical-align:middle;margin-left:4px">${App.icon("clipboard",13)}</a></td>
+                <td data-label="Status">${o.paymentCollected ? `<span class="pill-badge paid">Paid</span>` : `<span class="pill-badge pendingpay">Pending</span>`}</td></tr>`).join("")
+            + (orders.length ? "" : `<tr><td colspan="7" style="color:var(--muted);padding:22px;text-align:center">No transactions match this filter</td></tr>`)
+            + `</tbody></table></div></div>`;
+      view.querySelectorAll("[data-pf]").forEach((p) => p.addEventListener("click", () => { payFilter = p.dataset.pf; renderPayments(); }));
+      document.getElementById("payPendingChk").addEventListener("change", (e) => { payPendingOnly = e.target.checked; renderPayments(); });
+      bindDateRangeFilters();
+    }
+
+    function renderStock() {
+      const low = MENU.filter((m) => m.stock <= 10).length;
+      view.innerHTML = viewHead(`${MENU.length} items · ${low} low on stock`, "")
+        + `<div class="panel card"><div class="table-scroll"><table class="otable">
+            <thead><tr><th>Item</th><th>Category</th><th>Status</th><th style="text-align:right">Stock</th></tr></thead><tbody>`
+          + MENU.map((m) => `<tr>
+              <td><div style="display:flex;align-items:center;gap:10px"><img src="${m.image}" onerror="App.imgFallback(this)" style="width:40px;height:40px;border-radius:10px;object-fit:cover"/><b>${m.name}</b></div></td>
+              <td>${catName(m.category)}</td>
+              <td>${m.stock <= 0 ? `<span class="badge served">Out</span>` : m.stock <= 10 ? `<span class="badge pending">Low</span>` : `<span class="badge ready">In stock</span>`}</td>
+              <td><div class="stepper" data-stock="${m.id}" style="float:right"><button data-act="dec">${App.icon("minus", 15)}</button><b>${m.stock}</b><button data-act="inc">${App.icon("plus", 15)}</button></div></td>
+            </tr>`).join("")
+          + `</tbody></table></div></div>`;
+      view.querySelectorAll("[data-stock]").forEach((s) => {
+        const id = s.dataset.stock;
+        const change = async (delta) => {
+          const item = MENU.find((m) => m.id === id);
+          const stock = Math.max(0, item.stock + delta);
+          await Api.saveMenuItem({ id, stock });
+          item.stock = stock;
+          renderStock();
+        };
+        s.querySelector('[data-act="inc"]').addEventListener("click", () => change(1));
+        s.querySelector('[data-act="dec"]').addEventListener("click", () => change(-1));
+      });
+    }
+
+    /* Staff: each member is a real login (username + password), created by
+       the owner here. Clicking a card opens a reset-password dialog —
+       passwords are bcrypt-hashed server-side and can never be "looked up",
+       so resetting is the standard, secure way to hand out a new one. */
+    let showStaffForm = false, STAFF = [];
+    async function renderStaff() {
+      view.innerHTML = `<div class="skeleton"><span class="spin"></span> Loading staff…</div>`;
+      try { STAFF = await Api.getStaff(); } catch (e) { STAFF = []; }
+      const form = showStaffForm ? `<div class="panel card" style="margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="field"><label>Full name</label><input class="input" id="stName" placeholder="e.g. Rohan Das"/></div>
+            <div class="field"><label>Role</label><select class="input" id="stRole"><option value="waiter">Waiter</option><option value="manager">Manager</option><option value="cook">Cook</option></select></div>
+            <div class="field"><label>Login username</label><input class="input" id="stUser" placeholder="e.g. rohan.waiter"/></div>
+            <div class="field"><label>Password</label><input class="input" id="stPass" placeholder="Set a password" type="text"/></div>
+            <div class="field" style="margin-bottom:0"><label>Shift</label><select class="input" id="stShift"><option>Morning</option><option>Evening</option><option>Full day</option></select></div>
+          </div>
+          <button class="btn" id="stSave" style="margin-top:14px">Create login</button>
+          <div id="stMsg"></div>
+        </div>` : "";
+      view.innerHTML = viewHead(`${STAFF.length} team member${STAFF.length === 1 ? "" : "s"} · click anyone to manage their login`, `<button class="btn ${showStaffForm ? "btn-ghost" : ""}" id="toggleStaff">${showStaffForm ? "Close" : "+ Add staff login"}</button>`)
+        + form
+        + `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">`
+          + STAFF.map((s) => `<div class="card staff-card" data-staff="${s.id}">
+              <span class="avatar">${App.initials(s.name)}</span>
+              <div style="flex:1;min-width:0"><b>${s.name}</b><br><small style="color:var(--muted)">${s.username}</small></div>
+              <span class="role-pill">${s.role}</span>
+            </div>`).join("")
+          + `</div>`;
+      document.getElementById("toggleStaff").addEventListener("click", () => { showStaffForm = !showStaffForm; renderStaff(); });
+      if (showStaffForm) document.getElementById("stSave").addEventListener("click", async () => {
+        const name = document.getElementById("stName").value.trim();
+        const username = document.getElementById("stUser").value.trim();
+        const password = document.getElementById("stPass").value;
+        if (!name || !username || !password) { App.toast("Fill in name, username and password"); return; }
+        try {
+          await Api.addStaff({ name, username, password, role: document.getElementById("stRole").value, shift: document.getElementById("stShift").value });
+          App.toast("Staff login created"); showStaffForm = false; renderStaff();
+        } catch (e) { document.getElementById("stMsg").innerHTML = `<div class="alert-row" style="margin-top:10px">${e.message}</div>`; }
+      });
+      view.querySelectorAll("[data-staff]").forEach((card) => card.addEventListener("click", () => openStaffModal(card.dataset.staff)));
+    }
+
+    const staffModalBack = document.getElementById("staffModalBack");
+    function openStaffModal(id) {
+      const s = STAFF.find((x) => x.id === id);
+      document.getElementById("staffModal").innerHTML = `
+        <h3>${s.name}</h3>
+        <div class="field"><label>Login username</label><input class="input" value="${s.username}" readonly style="background:var(--cream)"></div>
+        <div class="field"><label>Role</label><input class="input" value="${s.role[0].toUpperCase()+s.role.slice(1)} · ${s.shift || ""}" readonly style="background:var(--cream)"></div>
+        <div class="field" style="margin-bottom:0"><label>Set a new password</label><input class="input" id="newPass" type="text" placeholder="Type a new password to reset it"></div>
+        <p style="font-size:11.5px;color:var(--muted);margin-top:8px">Passwords are securely hashed and can't be viewed — set a new one here and share it with ${s.name.split(" ")[0]}.</p>
+        <div id="staffModalMsg"></div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-ghost" id="staffModalClose" style="flex:1">Close</button>
+          ${s.role !== "owner" ? `<button type="button" class="btn" id="staffModalReset" style="flex:1">Reset password</button>` : ""}
+        </div>
+        ${s.role !== "owner" ? `<button type="button" class="btn btn-ghost" id="staffModalDelete" style="width:100%;margin-top:10px;color:var(--danger)">Remove this login</button>` : ""}`;
+      staffModalBack.classList.add("open");
+      document.getElementById("staffModalClose").addEventListener("click", () => staffModalBack.classList.remove("open"));
+      const resetBtn = document.getElementById("staffModalReset");
+      if (resetBtn) resetBtn.addEventListener("click", async () => {
+        const pw = document.getElementById("newPass").value;
+        if (!pw || pw.length < 4) { document.getElementById("staffModalMsg").innerHTML = `<p style="color:var(--danger);font-size:12px;margin-top:6px">Password must be at least 4 characters</p>`; return; }
+        try { await Api.resetStaffPassword(id, pw); App.toast("Password updated"); staffModalBack.classList.remove("open"); }
+        catch (e) { document.getElementById("staffModalMsg").innerHTML = `<p style="color:var(--danger);font-size:12px;margin-top:6px">${e.message}</p>`; }
+      });
+      const delBtn = document.getElementById("staffModalDelete");
+      if (delBtn) delBtn.addEventListener("click", async () => {
+        if (!confirm(`Remove ${s.name}'s login?`)) return;
+        await Api.deleteStaff(id);
+        staffModalBack.classList.remove("open");
+        renderStaff();
+      });
+    }
+    staffModalBack.addEventListener("click", (e) => { if (e.target === staffModalBack) staffModalBack.classList.remove("open"); });
+
+    function renderAnalytics() {
+      const s = STATS, pd = payData(), cats = catData();
+      const payEntries = Object.entries(pd).filter((e) => e[1] > 0);
+      const catEntries = Object.entries(cats).map(([k, v]) => [catName(k), v]).sort((a, b) => b[1] - a[1]);
+      const series = computeSeries(analyticsChartFilter);
+      view.innerHTML = viewHead("Sales performance & trends", "")
+        + `<div class="kpi-grid">
+            <div class="kpi card kpi-hero"><div class="kpi-ic">${App.icon("revenue", 20)}</div><div class="lbl">Total revenue</div><div class="val">${App.money(s.revenue)}</div></div>
+            <div class="kpi card orange"><div class="kpi-ic">${App.icon("clipboard", 20)}</div><div class="lbl">Orders</div><div class="val">${s.count}</div></div>
+            <div class="kpi card blue"><div class="kpi-ic">${App.icon("trend", 20)}</div><div class="lbl">Avg. order value</div><div class="val">${App.money(s.avg)}</div></div>
+            <div class="kpi card amber"><div class="kpi-ic">${App.icon("box", 20)}</div><div class="lbl">Dishes sold</div><div class="val">${topItemsData().reduce((a, b) => a + b[1].qty, 0)}</div></div>
+          </div>
+          <div class="dash-grid">
+            <div class="panel card"><div class="panel-head"><h3>Sales trend</h3>${chartFilterHTML(analyticsChartFilter, "analytics")}</div>${lineChartHTML(series.labels, series.values)}</div>
+            <div class="panel card"><div class="panel-head"><h3>Payment methods</h3></div>${hbars(payEntries)}</div>
+          </div>
+          <div style="height:20px"></div>
+          <div class="dash-grid">
+            <div class="panel card"><div class="panel-head"><h3>Sales by category</h3></div>${hbars(catEntries)}</div>
+            <div class="panel card"><div class="panel-head"><h3>Top selling items</h3></div>${topItemsHTML(6)}</div>
+          </div>`;
+      bindChartFilters();
+    }
+
+    async function renderSettings() {
+      view.innerHTML = `<div class="skeleton"><span class="spin"></span> Loading settings…</div>`;
+      const s = await Api.getSettings();
+      const role = (App.currentUser() || { role: "owner" }).role;
+      const customerLink = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}index.html?r=${s.slug}`;
+      const logoInner = s.logo ? `<img src="${s.logo}" alt="logo"/>` : App.icon("leaf", 30);
+      view.innerHTML = viewHead("Manage your restaurant profile, logo and customer link", "")
+        + `<div class="settings-grid">
+            <div class="panel card">
+              <div class="panel-head"><h3>Restaurant profile</h3></div>
+              <div class="logo-uploader" style="margin-bottom:20px">
+                <div class="logo-preview" id="logoPreview">${logoInner}</div>
+                <div>
+                  <label class="upload-btn">${App.icon("upload", 18)} Upload logo<input type="file" id="logoInput" accept="image/*" hidden></label>
+                  ${s.logo ? `<button class="btn btn-ghost" id="removeLogo" style="margin-left:8px;padding:11px 14px">Remove</button>` : ""}
+                  <div class="settings-hint">Square PNG/JPG works best · under 1.5 MB.</div>
+                </div>
+              </div>
+              <div class="field"><label>Restaurant name</label><input class="input" id="setName" value="${s.name}"></div>
+              <div class="field"><label>Tagline</label><input class="input" id="setTagline" value="${s.tagline || ""}"></div>
+              <div class="field" style="margin-bottom:0"><label>WhatsApp number (with country code)</label><input class="input" id="setPhone" value="${s.phone || ""}"></div>
+            </div>
+            <div class="stack">
+              <div class="panel card">
+                <div class="panel-head"><h3>Waiter &amp; staff logins</h3></div>
+                <p class="settings-hint" style="margin:0 0 12px">Create a separate login for every waiter, manager or cook from the <b>Staff</b> tab — each gets their own username and password.</p>
+                <a class="btn btn-ghost" href="dashboard.html#staff">Go to Staff →</a>
+              </div>
+              <div class="panel card">
+                <div class="panel-head"><h3>Customer link</h3></div>
+                <p class="settings-hint" style="margin:0 0 12px">Customers open this link (or scan a table QR). It shows only <b>${s.name}</b> — no other restaurant's data.</p>
+                <div class="link-box"><code id="custLink">${customerLink}</code><button class="btn btn-ghost" id="copyLink" style="padding:9px 12px">Copy</button></div>
+              </div>
+              <div class="panel card">
+                <div class="panel-head"><h3>Your own domain</h3></div>
+                <p class="settings-hint" style="margin:0 0 12px">Point a domain you own (e.g. <code>foodhouse.com</code>) at this app's DNS, then enter it here — customers who visit it will see <b>${s.name}</b> automatically, no <code>?r=</code> link needed.</p>
+                ${role === "owner"
+                  ? `<div class="field" style="margin-bottom:0"><input class="input" id="setDomain" placeholder="foodhouse.com" value="${s.customDomain || ""}"></div>`
+                  : `<p style="font-size:13px;color:var(--muted)">${s.customDomain ? `Currently: <b>${s.customDomain}</b>` : "Not set — ask the owner to add one."} (owner only)</p>`}
+              </div>
+              <div class="panel card">
+                <div class="panel-head"><h3>Close store</h3></div>
+                <div style="display:flex;align-items:center;gap:14px">
+                  <label class="switch"><input type="checkbox" id="closeStoreToggle" ${s.isClosed ? "checked" : ""}><span class="slider"></span></label>
+                  <p class="settings-hint" style="margin:0">When on, customers see a locked menu and can only view orders they've already placed — no new orders come in.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:20px"><button class="btn btn-lg" id="saveSettings">Save changes</button></div>
+          <div class="panel card" style="margin-top:20px">
+            <div class="panel-head"><h3>Financial years</h3><span class="link" id="fySub"></span></div>
+            <p class="settings-hint" style="margin:0 0 14px">Orders, payments and analytics are kept separate for each year. Menu, stock and customer/messaging data carry over automatically — nothing resets.</p>
+            <div id="fyList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px"></div>
+            <button class="btn btn-ghost" id="startFYBtn">+ Start new financial year</button>
+          </div>`;
+
+      // Financial years list (kept in sync with the top session switcher)
+      await loadSessions();
+      document.getElementById("fySub").textContent = `${SESSIONS.length} year${SESSIONS.length === 1 ? "" : "s"}`;
+      document.getElementById("fyList").innerHTML = SESSIONS.map((sess) => `
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px">
+          <b style="font-size:13.5px">${sess.name}</b>
+          ${sess.isActive ? `<span class="badge ready">Current</span>` : `<span class="chip">Past</span>`}
+          <span style="color:var(--muted);font-size:12px;margin-left:auto">Started ${new Date(sess.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+        </div>`).join("") || `<p style="color:var(--muted);font-size:13px">No financial years yet.</p>`;
+      document.getElementById("startFYBtn").addEventListener("click", async () => {
+        const name = prompt("Name this new financial year (menu, stock & customers carry over automatically):", nextFYName());
+        if (!name) return;
+        try {
+          const newS = await Api.createSession(name);
+          App.toast(`Started ${newS.name}`);
+          viewSessionId = newS.id;
+          renderSettings();
+        } catch (ex) { App.toast(ex.message); }
+      });
+
+      let pendingLogo = null;
+      document.getElementById("logoInput").addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 1.5 * 1024 * 1024) { App.toast("Please use an image under 1.5 MB"); return; }
+        const reader = new FileReader();
+        reader.onload = () => { pendingLogo = reader.result; document.getElementById("logoPreview").innerHTML = `<img src="${pendingLogo}" alt="logo"/>`; };
+        reader.readAsDataURL(file);
+      });
+      const rm = document.getElementById("removeLogo");
+      if (rm) rm.addEventListener("click", () => { pendingLogo = ""; document.getElementById("logoPreview").innerHTML = App.icon("leaf", 30); });
+      document.getElementById("copyLink").addEventListener("click", () => { navigator.clipboard && navigator.clipboard.writeText(customerLink); App.toast("Customer link copied"); });
+      document.getElementById("saveSettings").addEventListener("click", async () => {
+        const patch = {
+          name: document.getElementById("setName").value.trim() || s.name,
+          tagline: document.getElementById("setTagline").value.trim(),
+          phone: document.getElementById("setPhone").value.trim(),
+          isClosed: document.getElementById("closeStoreToggle").checked,
+        };
+        if (pendingLogo !== null) patch.logo = pendingLogo;
+        const domainInput = document.getElementById("setDomain");
+        if (domainInput) patch.customDomain = domainInput.value.trim();
+        try {
+          await Api.saveSettings(patch);
+        } catch (ex) { App.toast(ex.message); return; }
+        App.toast("Settings saved");
+        await Api.me();
+        App.mountSidebar("sidebar", "settings");
+        App.mountTopbar("topbar", "Settings");
+        renderSettings();
+      });
+    }
+
+    /* ---------- router ---------- */
+    const TITLES = { overview: "Overview", orders: "Live orders", payments: "Payments", stock: "Stock", staff: "Staff", analytics: "Analytics", settings: "Settings" };
+    const VIEWS = { overview: renderOverview, orders: renderOrders, payments: renderPayments, stock: renderStock, staff: renderStaff, analytics: renderAnalytics, settings: renderSettings };
+    const currentView = () => { const h = location.hash.replace("#", ""); return VIEWS[h] ? h : "overview"; };
+    async function route() {
+      let v = currentView();
+      const role = (App.currentUser() || { role: "owner" }).role;
+      const navItem = App.NAV.find((n) => n.key === v);
+      if (navItem && !navItem.roles.includes(role)) {
+        if (location.hash !== "#overview") { location.hash = "#overview"; return; }
+        v = "overview";
+      }
+      App.setActiveNav("sidebar", v);
+      App.mountMobileNav("mobileNav", v);
+      App.setTopbarTitle(TITLES[v]);
+      window.scrollTo(0, 0);
+      // The session bar only matters for views built from order data —
+      // Menu, Stock, Staff, Settings and Send Message carry over every year.
+      document.getElementById("sessionBar").style.display = ["overview", "orders", "payments", "analytics"].includes(v) ? "" : "none";
+      await VIEWS[v]();
+    }
+
+    // Add-table modal (shared, reachable from Overview → Tables panel too)
+    const tableModalBack = document.getElementById("tableModalBack");
+    document.getElementById("tableModalCancel").addEventListener("click", () => tableModalBack.classList.remove("open"));
+    tableModalBack.addEventListener("click", (e) => { if (e.target === tableModalBack) tableModalBack.classList.remove("open"); });
+    document.getElementById("tableModal").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await Api.addTable({ number: Number(document.getElementById("newTableNum").value), seats: Number(document.getElementById("newTableSeats").value) });
+        App.toast("Table added");
+        tableModalBack.classList.remove("open");
+        TABLES = await Api.getTables();
+        if (currentView() === "overview") renderOverview();
+      } catch (e2) { App.toast(e2.message); }
+    });
+
+    let SLUG = "";
+    async function main() {
+      const authData = await Api.requireAuth();
+      if (!authData) return;
+      SLUG = authData.tenant.slug;
+      App.mountSidebar("sidebar", currentView());
+      App.mountTopbar("topbar", TITLES[currentView()], async () => { await loadCore(); renderSessionBar(); route(); App.toast("Refreshed"); });
+      await loadSessions();
+      renderSessionBar();
+      await loadCore();
+      window.addEventListener("hashchange", route);
+      route();
+    }
+    main();
+  </script>
+</body>
+</html>

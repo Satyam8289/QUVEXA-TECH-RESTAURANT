@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Checkout — The Food House</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+</head>
+<body class="customer">
+  <div class="phone">
+    <div id="brand"></div>
+
+    <form id="checkoutForm">
+      <div class="section" style="padding-bottom:6px">
+        <div class="card" style="padding:18px">
+          <div class="field">
+            <label for="name">Your name</label>
+            <input class="input" id="name" required placeholder="e.g. Ananya" />
+          </div>
+          <div class="field">
+            <label for="phone">Phone number (for WhatsApp updates)</label>
+            <input class="input" id="phone" type="tel" required inputmode="tel" placeholder="+91 98765 43210" />
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label for="table">Table number</label>
+            <input class="input" id="table" type="number" min="1" max="12" required placeholder="e.g. 4" />
+          </div>
+        </div>
+      </div>
+
+      <div class="section" style="padding-top:10px;padding-bottom:6px">
+        <label style="font-size:13px;font-weight:600;color:var(--muted);display:block;margin-bottom:10px">Payment method</label>
+        <div class="pay-methods" id="payMethods">
+          <button type="button" class="pay active" data-pay="UPI"><span class="pay-ico">₹</span>UPI</button>
+          <button type="button" class="pay" data-pay="Card"><span class="pay-ico">▭</span>Card</button>
+          <button type="button" class="pay" data-pay="Cash"><span class="pay-ico">◎</span>Cash</button>
+        </div>
+      </div>
+
+      <div class="section" style="padding-top:10px">
+        <div class="card summary" id="summary"></div>
+      </div>
+      <div style="height:20px"></div>
+    </form>
+  </div>
+
+  <div class="docked" id="dock"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if (!Cart.all().length) location.href = "menu.html";
+
+    // Prefill from the identity captured on the menu page.
+    const known = App.getCustomer();
+    if (known) { document.getElementById("name").value = known.name; document.getElementById("phone").value = known.phone; }
+
+    let method = "UPI";
+    const tableField = document.getElementById("table");
+    tableField.value = App.getTableNo();
+    // If the table came from scanning its QR, lock it so it can't be changed.
+    if (App.isTableLocked() && App.getTableNo()) {
+      tableField.readOnly = true;
+      tableField.style.background = "var(--green-50)";
+      tableField.insertAdjacentHTML("afterend",
+        `<small style="color:var(--green-700);font-weight:600;font-size:12px;margin-top:6px;display:inline-flex;align-items:center;gap:5px">${App.icon("check",14)} Auto-detected from your table's QR code</small>`);
+    }
+
+    document.querySelectorAll(".pay").forEach(p =>
+      p.addEventListener("click", () => {
+        document.querySelectorAll(".pay").forEach(x => x.classList.remove("active"));
+        p.classList.add("active");
+        method = p.dataset.pay;
+      }));
+
+    const sub = () => Cart.subtotal();
+    const gst = () => Math.round(sub() * 0.05);
+    const service = () => Math.round(sub() * 0.03);
+    const total = () => sub() + gst() + service();
+
+    async function main() {
+      let closed = false;
+      try { const data = await Api.loadPublic(); closed = !!data.tenant.isClosed; } catch (e) { /* keep going, backend errors surface on submit */ }
+      document.getElementById("brand").innerHTML = App.brandBar({ back: "cart.html", subtitle: "Checkout" });
+      if (closed) {
+        document.getElementById("checkoutForm").innerHTML = `<div class="empty">${App.icon("lock",44)}<h3>Store is closed</h3><p>This restaurant isn't accepting new orders right now. Please try again later.</p><a class="btn" style="margin-top:16px" href="menu.html">Back to menu</a></div>`;
+        document.getElementById("dock").innerHTML = "";
+        return;
+      }
+      document.getElementById("summary").innerHTML = `
+        <div class="row"><span>Subtotal</span><span>${App.money(sub())}</span></div>
+        <div class="row"><span>GST (5%)</span><span>${App.money(gst())}</span></div>
+        <div class="row"><span>Service charge</span><span>${App.money(service())}</span></div>
+        <div class="row total"><span>Total payable</span><span>${App.money(total())}</span></div>`;
+      document.getElementById("dock").innerHTML =
+        `<button class="btn btn-block btn-lg" type="submit" form="checkoutForm">Place Order · ${App.money(total())}</button>`;
+    }
+    main();
+
+    document.getElementById("checkoutForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("name").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const table = document.getElementById("table").value.trim();
+      if (!name || !phone || !table) { App.toast("Please fill all fields"); return; }
+      App.setTableNo(table);
+      App.setCustomer({ name, phone });
+
+      const submitBtn = document.querySelector('#dock button');
+      submitBtn.disabled = true; submitBtn.textContent = "Placing order…";
+      try {
+        const order = await Api.placeOrderPublic({
+          table: Number(table),
+          customer: name,
+          phone,
+          method,
+          items: Cart.all().map(l => ({ id: l.id, name: l.name, qty: l.qty, price: l.price, note: l.note || "" })),
+        });
+        localStorage.setItem("foodhouse-lastOrder", order.code);
+        Cart.clear();
+        location.href = "thankyou.html";
+      } catch (ex) {
+        App.toast(ex.message || "Couldn't place your order. Please try again.");
+        submitBtn.disabled = false; submitBtn.textContent = `Place Order · ${App.money(total())}`;
+      }
+    });
+  </script>
+</body>
+</html>

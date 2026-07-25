@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Super Admin — Platform Control</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231e293b'/%3E%3Cpath d='M12 3l7 4v6c0 4.5-3 7.5-7 8-4-.5-7-3.5-7-8V7l7-4Z' fill='%23fff'/%3E%3C/svg%3E" />
+  <style>
+    /* This page intentionally uses a distinct slate/indigo palette instead
+       of the emerald restaurant theme — a visual signal that you're in the
+       platform-level control panel, not any one restaurant's dashboard. */
+    :root {
+      --green-50: #eef2ff; --green-100: #e0e7ff; --green-600: #4f46e5; --green-700: #4338ca; --green-800: #363198; --green-900: #241e6b;
+      --orange: #f97316; --orange-600: #ea580c;
+      --cream: #f4f5f9; --cream-2: #f9fafc;
+    }
+    body { background: var(--cream); }
+    .sa-login { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    .sa-login-card { width: 100%; max-width: 400px; padding: 34px 30px; text-align: center; }
+    .sa-mark { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 16px; background: linear-gradient(140deg, var(--green-700), var(--green-900)); display: grid; place-items: center; color: #fff; }
+    .sa-topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 30px; background: var(--white); border-bottom: 1px solid var(--line); }
+    .sa-topbar .brand { display: flex; align-items: center; gap: 12px; }
+    .sa-main { max-width: 1200px; margin: 0 auto; padding: 28px 24px 60px; }
+    .tenant-card { padding: 18px; }
+    .tenant-card .th { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .tenant-card .th b { font-family: var(--serif); font-size: 17px; }
+    .tenant-card .th small { display: block; color: var(--muted); font-size: 12px; }
+    .tenant-card .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 14px; }
+    .tenant-card .stats-row div { text-align: center; background: var(--cream); border-radius: 10px; padding: 8px 4px; }
+    .tenant-card .stats-row b { display: block; font-size: 15px; }
+    .tenant-card .stats-row small { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .domain-row { display: flex; gap: 8px; align-items: center; }
+    .domain-row input { flex: 1; }
+    .tenants-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px,1fr)); gap: 16px; }
+  </style>
+</head>
+<body>
+  <!-- Login screen -->
+  <div class="sa-login" id="loginScreen">
+    <form class="sa-login-card card" id="loginForm">
+      <div class="sa-mark" id="mark"></div>
+      <h1 style="font-family:var(--serif);font-size:24px">Super Admin</h1>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:24px">Platform control — not a restaurant login</p>
+      <div class="err" id="err" style="display:none;align-items:center;gap:8px;background:var(--danger-50);color:#991b1b;font-size:13px;font-weight:600;padding:10px 12px;border-radius:12px;margin-bottom:14px;text-align:left"></div>
+      <div class="field" style="text-align:left"><label>Username</label><input class="input" id="username" required /></div>
+      <div class="field" style="text-align:left;margin-bottom:0"><label>Password</label><input class="input" id="password" type="password" required /></div>
+      <button class="btn btn-block btn-lg" type="submit" style="margin-top:18px">Sign in</button>
+    </form>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashScreen" style="display:none">
+    <div class="sa-topbar">
+      <div class="brand"><span class="sa-mark" style="width:38px;height:38px;border-radius:11px"></span>
+        <div><strong style="font-family:var(--serif)">Super Admin</strong><br><small style="color:var(--muted)">Platform control panel</small></div></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span id="adminName" style="font-size:13px;color:var(--muted)"></span>
+        <button class="btn btn-ghost" id="logoutBtn" style="padding:9px 16px">Sign out</button>
+      </div>
+    </div>
+
+    <div class="sa-main">
+      <div class="view-head">
+        <p>Every restaurant on this platform — onboard new ones and manage domains from here.</p>
+        <div class="actions"><button class="btn btn-orange" id="addBtn">+ Add restaurant</button></div>
+      </div>
+
+      <div class="kpi-grid" id="statsRow"></div>
+
+      <div class="tenants-grid" id="tenantsGrid"></div>
+    </div>
+  </div>
+
+  <!-- Add restaurant modal -->
+  <div class="modal-back" id="addModalBack">
+    <form class="modal card" id="addForm" style="max-width:480px">
+      <h3>Add a new restaurant</h3>
+      <div class="field"><label>Restaurant name</label><input class="input" id="f-name" required placeholder="e.g. Punjabi Tadka" /></div>
+      <div class="field"><label>Address</label><input class="input" id="f-address" placeholder="City, area" /></div>
+      <div class="field"><label>WhatsApp / phone</label><input class="input" id="f-phone" placeholder="+91 98765 43210" /></div>
+      <div class="field"><label>Number of tables</label><input class="input" id="f-tables" type="number" min="1" value="12" /></div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+      <p style="font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Owner login</p>
+      <div class="field"><label>Owner's name</label><input class="input" id="f-ownerName" required placeholder="e.g. Ramesh Kapoor" /></div>
+      <div class="field"><label>Owner username / email</label><input class="input" id="f-ownerUser" required placeholder="owner@restaurant.com" /></div>
+      <div class="field" style="margin-bottom:0"><label>Owner password</label><input class="input" id="f-ownerPass" required type="text" placeholder="Set an initial password" /></div>
+      <div id="addMsg"></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="addCancel" style="flex:1">Cancel</button>
+        <button type="submit" class="btn" style="flex:1">Create restaurant</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Success modal -->
+  <div class="modal-back" id="successModalBack">
+    <div class="modal card" id="successModal" style="max-width:440px;text-align:center"></div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/api-admin.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.getElementById("mark").innerHTML = App.icon("gear", 26);
+    document.querySelector(".sa-topbar .sa-mark").innerHTML = App.icon("gear", 18);
+
+    const loginScreen = document.getElementById("loginScreen");
+    const dashScreen = document.getElementById("dashScreen");
+
+    function showDash() {
+      loginScreen.style.display = "none";
+      dashScreen.style.display = "block";
+      document.getElementById("adminName").textContent = AdminApi.currentAdmin()?.username || "";
+      loadAll();
+    }
+    function showLogin() {
+      loginScreen.style.display = "grid";
+      dashScreen.style.display = "none";
+    }
+
+    const err = document.getElementById("err");
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      err.style.display = "none";
+      try {
+        await AdminApi.login(document.getElementById("username").value, document.getElementById("password").value);
+        showDash();
+      } catch (ex) { err.textContent = ex.message; err.style.display = "flex"; }
+    });
+    document.getElementById("logoutBtn").addEventListener("click", () => { AdminApi.logout(); showLogin(); });
+
+    let TENANTS = [];
+    async function loadAll() {
+      const [stats, tenants] = await Promise.all([AdminApi.getStats(), AdminApi.getTenants()]);
+      TENANTS = tenants;
+      document.getElementById("statsRow").innerHTML = [
+        ["floor", "Restaurants", stats.restaurants, ""],
+        ["clipboard", "Total orders", stats.totalOrders, "orange"],
+        ["revenue", "Total revenue (all time)", `₹${Number(stats.totalRevenue).toLocaleString("en-IN")}`, "kpi-hero"],
+        ["users", "Staff accounts", stats.staffAccounts, "blue"],
+      ].map(([ic, lbl, val, cls]) => `<div class="kpi card ${cls}"><div class="kpi-ic">${App.icon(ic,20)}</div><div class="lbl">${lbl}</div><div class="val">${val}</div></div>`).join("");
+
+      document.getElementById("tenantsGrid").innerHTML = tenants.map((t) => `
+        <div class="card tenant-card">
+          <div class="th">
+            <span class="avatar" style="border-radius:12px">${App.initials(t.name)}</span>
+            <div><b>${t.name}</b><small>/${t.slug} · owner: ${t.ownerUsername || "—"}</small></div>
+            ${t.isClosed ? `<span class="badge pending" style="margin-left:auto">Closed</span>` : `<span class="badge ready" style="margin-left:auto">Open</span>`}
+          </div>
+          <div class="stats-row">
+            <div><b>${t.staffCount}</b><small>Staff</small></div>
+            <div><b>${t.orderCount}</b><small>Orders</small></div>
+            <div><b>₹${Number(t.totalRevenue).toLocaleString("en-IN")}</b><small>Revenue</small></div>
+          </div>
+          <div class="domain-row">
+            <input class="input" data-domain-for="${t.id}" placeholder="restaurant-domain.com" value="${t.customDomain || ""}" style="padding:9px 12px">
+            <button class="btn btn-ghost" data-save-domain="${t.id}" style="padding:9px 12px">Save</button>
+          </div>
+          <div id="domainMsg-${t.id}"></div>
+          <a class="link" href="index.html?r=${t.slug}" target="_blank" style="display:inline-block;margin-top:10px;font-size:12.5px">View customer page →</a>
+        </div>`).join("") || `<p style="color:var(--muted)">No restaurants yet — add your first one.</p>`;
+
+      document.querySelectorAll("[data-save-domain]").forEach((b) => b.addEventListener("click", async () => {
+        const id = b.dataset.saveDomain;
+        const val = document.querySelector(`[data-domain-for="${id}"]`).value.trim();
+        try {
+          await AdminApi.updateTenant(id, { customDomain: val });
+          App.toast("Domain updated");
+          loadAll();
+        } catch (ex) { document.getElementById(`domainMsg-${id}`).innerHTML = `<p style="color:var(--danger);font-size:12px;margin-top:6px">${ex.message}</p>`; }
+      }));
+    }
+
+    const addModal = document.getElementById("addModalBack");
+    document.getElementById("addBtn").addEventListener("click", () => addModal.classList.add("open"));
+    document.getElementById("addCancel").addEventListener("click", () => addModal.classList.remove("open"));
+    addModal.addEventListener("click", (e) => { if (e.target === addModal) addModal.classList.remove("open"); });
+
+    document.getElementById("addForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById("f-name").value.trim(),
+        address: document.getElementById("f-address").value.trim(),
+        phone: document.getElementById("f-phone").value.trim(),
+        tableCount: Number(document.getElementById("f-tables").value) || 12,
+        ownerName: document.getElementById("f-ownerName").value.trim(),
+        ownerUsername: document.getElementById("f-ownerUser").value.trim(),
+        ownerPassword: document.getElementById("f-ownerPass").value,
+      };
+      try {
+        const result = await AdminApi.createTenant(payload);
+        addModal.classList.remove("open");
+        document.getElementById("addForm").reset();
+        document.getElementById("f-tables").value = 12;
+        const link = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}${result.customerLink.replace(/^\//, "")}`;
+        document.getElementById("successModal").innerHTML = `
+          <div style="color:var(--green-700);margin-bottom:10px">${App.icon("check",44)}</div>
+          <h3 style="font-family:var(--serif);font-size:20px;margin-bottom:6px">${result.name} is live</h3>
+          <p style="color:var(--muted);font-size:13.5px;margin-bottom:18px">Share these with the owner:</p>
+          <div class="link-box" style="margin-bottom:10px"><code>${link}</code></div>
+          <div class="link-box" style="margin-bottom:18px"><code>Login: ${result.ownerLogin}</code></div>
+          <button class="btn btn-block" id="successClose">Done</button>`;
+        document.getElementById("successModalBack").classList.add("open");
+        document.getElementById("successClose").addEventListener("click", () => document.getElementById("successModalBack").classList.remove("open"));
+        loadAll();
+      } catch (ex) {
+        document.getElementById("addMsg").innerHTML = `<p style="color:var(--danger);font-size:12px;margin-top:8px">${ex.message}</p>`;
+      }
+    });
+
+    if (AdminApi.isAuthed()) showDash(); else showLogin();
+  </script>
+</body>
+</html>

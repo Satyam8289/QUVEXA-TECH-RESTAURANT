@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff Login — Restaurant Admin</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+  <style>
+    .login-wrap { background:
+      radial-gradient(1000px 500px at 50% -10%, #e2efe6 0%, transparent 60%), var(--cream); }
+    .pw-wrap { position: relative; }
+    .pw-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 8px; }
+    .pw-toggle:hover { background: var(--green-50); color: var(--green-800); }
+    .err { display: none; align-items: center; gap: 8px; background: var(--danger-50); color: #991b1b; font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 12px; margin-bottom: 14px; text-align: left; }
+    .err.show { display: flex; }
+    .offline { display: none; align-items: center; gap: 8px; background: #fff4e5; color: #92400e; font-size: 12.5px; font-weight: 600; padding: 10px 12px; border-radius: 12px; margin-top: 14px; text-align: left; }
+    .offline.show { display: flex; }
+    .login-card .brand-mark.has-logo img { object-fit: cover; }
+    .login-card h1 { transition: opacity .15s; }
+    .btn[disabled] { opacity: .6; }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <form class="login-card card" id="loginForm" autocomplete="on">
+      <span class="brand-mark" id="mark"></span>
+      <h1 id="tname">Restaurant Admin</h1>
+      <p class="sub" id="tsub">Sign in to manage your restaurant</p>
+
+      <div class="err" id="err"><span id="errIco"></span><span id="errMsg">Invalid username or password.</span></div>
+
+      <div class="field">
+        <label for="username">Email or username</label>
+        <input class="input" id="username" type="text" required placeholder="owner email or waiter username" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="pw-wrap">
+          <input class="input" id="password" type="password" required placeholder="••••••••" autocomplete="current-password" />
+          <button type="button" class="pw-toggle" id="pwToggle">Show</button>
+        </div>
+      </div>
+
+      <button class="btn btn-block btn-lg" type="submit" id="submitBtn">Sign in</button>
+      <div class="offline" id="offline"><span id="offlineIco"></span><span>Can't reach the server — make sure the backend is running.</span></div>
+    </form>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    // If already signed in, go straight to the dashboard.
+    if (Api.isAuthed()) location.replace("dashboard.html");
+
+    document.getElementById("mark").innerHTML = App.icon("leaf", 24);
+    document.getElementById("errIco").innerHTML = App.icon("alert", 16);
+    document.getElementById("offlineIco").innerHTML = App.icon("alert", 15);
+
+    // Password show/hide
+    const pw = document.getElementById("password");
+    document.getElementById("pwToggle").addEventListener("click", (e) => {
+      const show = pw.type === "password";
+      pw.type = show ? "text" : "password";
+      e.target.textContent = show ? "Hide" : "Show";
+    });
+
+    // Live branding: as the staff member types their username, look up
+    // which restaurant it belongs to and show that restaurant's name/logo —
+    // so two owners on the same shared login page each see their own brand.
+    const nameEl = document.getElementById("tname"), subEl = document.getElementById("tsub"), markEl = document.getElementById("mark");
+    function resetBrand() {
+      nameEl.textContent = "Restaurant Admin";
+      subEl.textContent = "Sign in to manage your restaurant";
+      markEl.className = "brand-mark";
+      markEl.innerHTML = App.icon("leaf", 24);
+    }
+    let lookupTimer;
+    document.getElementById("username").addEventListener("input", (e) => {
+      clearTimeout(lookupTimer);
+      const val = e.target.value.trim();
+      if (!val) { resetBrand(); return; }
+      lookupTimer = setTimeout(async () => {
+        try {
+          const info = await Api.lookupBranding(val);
+          if (!info) { resetBrand(); return; }
+          nameEl.textContent = info.name;
+          subEl.textContent = info.tagline || "Sign in to manage your restaurant";
+          if (info.logo) { markEl.className = "brand-mark has-logo"; markEl.innerHTML = `<img src="${info.logo}" alt="logo">`; }
+          else { markEl.className = "brand-mark"; markEl.innerHTML = App.icon("leaf", 24); }
+        } catch (e) { /* offline or bad request — keep current branding */ }
+      }, 250);
+    });
+
+    const err = document.getElementById("err");
+    const offline = document.getElementById("offline");
+    const submitBtn = document.getElementById("submitBtn");
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      err.classList.remove("show");
+      offline.classList.remove("show");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Signing in…";
+      try {
+        await Api.login(document.getElementById("username").value, pw.value);
+        location.href = "dashboard.html";
+      } catch (ex) {
+        if (ex.offline) offline.classList.add("show");
+        else { err.classList.add("show"); document.getElementById("errMsg").textContent = ex.message || "Invalid username or password."; }
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Sign in";
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Order Confirmed — The Food House</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+</head>
+<body class="customer">
+  <div class="phone">
+    <div class="center-wrap">
+      <div class="success-badge" id="badge"></div>
+      <h1>Order Confirmed!</h1>
+      <p>Thanks <b id="cust">there</b> — your order has been sent to the kitchen.</p>
+
+      <div class="order-id-box">
+        <small>Order ID</small>
+        <b id="oid">FH-0000</b>
+      </div>
+
+      <div class="card" style="width:100%;padding:16px;text-align:left" id="recap"></div>
+
+      <div style="width:100%;display:flex;flex-direction:column;gap:10px;margin-top:22px">
+        <a class="btn btn-wa btn-block btn-lg" id="waBtn" target="_blank" rel="noopener">
+          <span id="waIco"></span> Send order on WhatsApp
+        </a>
+        <div style="display:flex;gap:10px">
+          <a class="btn btn-ghost btn-block" id="billBtn" target="_blank" rel="noopener">${''}<span id="billIco"></span> Download Bill</a>
+          <a class="btn btn-ghost btn-block" id="waSelfBtn" target="_blank" rel="noopener"><span id="waSelfIco"></span> To my WhatsApp</a>
+        </div>
+        <a class="btn btn-block btn-lg" id="trackBtn" href="tracking.html">Track my order</a>
+        <div style="display:flex;gap:10px">
+          <a class="btn btn-ghost btn-block" href="orders.html">My Orders</a>
+          <a class="btn btn-ghost btn-block" href="menu.html">Order more</a>
+        </div>
+      </div>
+      <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:10px">You can also collect &amp; pay for this order at the reception counter.</p>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.getElementById("badge").innerHTML = App.icon("check", 46);
+    document.getElementById("waIco").innerHTML = App.icon("whatsapp", 20);
+    document.getElementById("waSelfIco").innerHTML = App.icon("whatsapp", 18);
+    document.getElementById("billIco").innerHTML = App.icon("clipboard", 18);
+
+    async function main() {
+      const code = localStorage.getItem("foodhouse-lastOrder");
+      if (!code) { location.href = "index.html"; return; }
+      try {
+        await Api.loadPublic();
+        const order = await Api.getOrderByCode(code);
+        document.getElementById("oid").textContent = order.code;
+        document.getElementById("cust").textContent = order.customer || "there";
+        document.getElementById("recap").innerHTML =
+          order.items.map(it =>
+            `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:14px">
+               <span>${it.qty} × ${it.name}</span><span>${App.money(it.price * it.qty)}</span></div>`).join("") +
+          `<div style="display:flex;justify-content:space-between;padding-top:10px;margin-top:6px;border-top:1px dashed var(--line);font-weight:700">
+             <span>Table ${order.table ?? "—"} · ${order.method}</span><span>${App.money(order.total)}</span></div>`;
+        document.getElementById("waBtn").href = App.whatsappOrderLink(order);
+        document.getElementById("waSelfBtn").href = App.whatsappOrderLink(order, order.phone);
+        document.getElementById("billBtn").href = `bill.html?code=${encodeURIComponent(order.code)}&r=${Api.tenantSlug()}`;
+      } catch (e) {
+        location.href = "index.html";
+      }
+    }
+    main();
+  </script>
+</body>
+</html>

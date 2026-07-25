@@ -37,7 +37,10 @@ app.use((err, _req, res, _next) => {
 
 async function main() {
   await initDb();
-  await seedIfEmpty();
+  // Demo restaurants (with well-known passwords) are only useful for local
+  // development — never auto-seed them in production, even if the tenants
+  // table happens to be empty (e.g. right after deleting a demo tenant).
+  if (process.env.NODE_ENV !== "production") await seedIfEmpty();
   const server = app.listen(PORT, () => console.log(`[api] listening on http://localhost:${PORT}`));
 
   const stop = async () => { console.log("\n[api] shutting down…"); server.close(); await shutdownDb(); process.exit(0); };

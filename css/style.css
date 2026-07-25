@@ -418,12 +418,12 @@ textarea.input { resize: vertical; min-height: 76px; }
 
 /* ---- KPI cards: uppercase label → big number → delta, icon badge top-right ---- */
 .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
-.kpi { height: 128px; box-sizing: border-box; padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 6px; position: relative; }
+.kpi { height: 128px; box-sizing: border-box; padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 6px; position: relative; min-width: 0; }
 .kpi .kpi-ic { position: absolute; top: 18px; right: 18px; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: var(--green-800); background: var(--green-50); }
 .kpi.orange .kpi-ic { color: var(--orange-600); background: var(--orange-50); }
 .kpi.blue .kpi-ic { color: var(--blue); background: #eaf0ff; }
 .kpi.amber .kpi-ic { color: var(--amber); background: #fff4e5; }
-.kpi .lbl { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding-right: 40px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi .lbl { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding-right: 40px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .kpi .val { font-family: var(--serif); font-size: 30px; font-weight: 600; line-height: 1.15; }
 .kpi .delta { font-size: 12px; font-weight: 600; color: var(--green-700); }
 .kpi.kpi-hero { background: linear-gradient(150deg, var(--green-700), var(--green-900)); color: #fff; border: none; }

@@ -108,9 +108,13 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_collected BOOLEAN NOT NULL D
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS collected_by TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS collected_at TIMESTAMPTZ;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS session_id UUID REFERENCES sessions(id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_order_id TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_payment_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_orders_session ON orders(session_id);
--- Cash orders start uncollected; everything else (UPI/Card) is settled instantly.
-UPDATE orders SET payment_collected = true WHERE method <> 'Cash' AND payment_collected = false;
+-- Cash orders start uncollected; everything else (UPI/Card, chosen at the
+-- counter) is settled instantly. Razorpay is the one online method that
+-- stays uncollected until its payment is actually verified.
+UPDATE orders SET payment_collected = true WHERE method NOT IN ('Cash','Razorpay') AND payment_collected = false;
 
 -- Platform-level operator (you) — separate from every restaurant's own
 -- owner/manager/waiter accounts. Logs into a distinct Super Admin panel to

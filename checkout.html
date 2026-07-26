@@ -36,6 +36,9 @@
           <button type="button" class="pay" data-pay="Card"><span class="pay-ico">▭</span>Card</button>
           <button type="button" class="pay" data-pay="Cash"><span class="pay-ico">◎</span>Cash</button>
         </div>
+        <div class="pay-methods" id="payMethodsOnline" style="display:none;margin-top:8px">
+          <button type="button" class="pay" data-pay="Razorpay" style="width:100%"><span class="pay-ico">🔒</span>Pay Online (Razorpay)</button>
+        </div>
       </div>
 
       <div class="section" style="padding-top:10px">
@@ -50,6 +53,21 @@
   <script src="js/api.js"></script>
   <script src="js/cart.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    // Loaded lazily (only when the restaurant has Razorpay connected and the
+    // customer actually picks "Pay Online") so pages that never use it don't
+    // pay for an extra external script.
+    function loadRazorpayScript() {
+      return new Promise((resolve, reject) => {
+        if (window.Razorpay) return resolve();
+        const s = document.createElement("script");
+        s.src = "https://checkout.razorpay.com/v1/checkout.js";
+        s.onload = resolve;
+        s.onerror = () => reject(new Error("Could not load the payment gateway. Check your connection and try again."));
+        document.head.appendChild(s);
+      });
+    }
+  </script>
   <script>
     if (!Cart.all().length) location.href = "menu.html";
 
@@ -80,9 +98,15 @@
     const service = () => Math.round(sub() * 0.03);
     const total = () => sub() + gst() + service();
 
+    let tenantName = "";
     async function main() {
       let closed = false;
-      try { const data = await Api.loadPublic(); closed = !!data.tenant.isClosed; } catch (e) { /* keep going, backend errors surface on submit */ }
+      try {
+        const data = await Api.loadPublic();
+        closed = !!data.tenant.isClosed;
+        tenantName = data.tenant.name;
+        if (data.tenant.razorpayEnabled) document.getElementById("payMethodsOnline").style.display = "";
+      } catch (e) { /* keep going, backend errors surface on submit */ }
       document.getElementById("brand").innerHTML = App.brandBar({ back: "cart.html", subtitle: "Checkout" });
       if (closed) {
         document.getElementById("checkoutForm").innerHTML = `<div class="empty">${App.icon("lock",44)}<h3>Store is closed</h3><p>This restaurant isn't accepting new orders right now. Please try again later.</p><a class="btn" style="margin-top:16px" href="menu.html">Back to menu</a></div>`;
@@ -108,22 +132,61 @@
       App.setTableNo(table);
       App.setCustomer({ name, phone });
 
+      const items = Cart.all().map(l => ({ id: l.id, name: l.name, qty: l.qty, price: l.price, note: l.note || "" }));
       const submitBtn = document.querySelector('#dock button');
+      const resetBtn = () => { submitBtn.disabled = false; submitBtn.textContent = `Place Order · ${App.money(total())}`; };
+
+      if (method === "Razorpay") {
+        submitBtn.disabled = true; submitBtn.textContent = "Starting payment…";
+        try {
+          await loadRazorpayScript();
+          const rzp = await Api.razorpayCreateOrder(items);
+          const checkout = new Razorpay({
+            key: rzp.keyId,
+            order_id: rzp.razorpayOrderId,
+            amount: rzp.amount,
+            currency: rzp.currency,
+            name: tenantName,
+            description: `Table ${table}`,
+            prefill: { name, contact: phone },
+            theme: { color: "#0f5132" },
+            handler: async (resp) => {
+              submitBtn.textContent = "Confirming payment…";
+              try {
+                const order = await Api.razorpayVerifyAndPlaceOrder({
+                  razorpay_order_id: resp.razorpay_order_id,
+                  razorpay_payment_id: resp.razorpay_payment_id,
+                  razorpay_signature: resp.razorpay_signature,
+                  table: Number(table), customer: name, phone, items,
+                });
+                localStorage.setItem("foodhouse-lastOrder", order.code);
+                Cart.clear();
+                location.href = "thankyou.html";
+              } catch (ex) {
+                App.toast(ex.message || "Payment succeeded but we couldn't confirm your order. Please contact the restaurant.");
+                resetBtn();
+              }
+            },
+            modal: { ondismiss: () => { App.toast("Payment cancelled"); resetBtn(); } },
+          });
+          checkout.on("payment.failed", () => { App.toast("Payment failed. Please try again."); resetBtn(); });
+          checkout.open();
+        } catch (ex) {
+          App.toast(ex.message || "Couldn't start payment. Please try again.");
+          resetBtn();
+        }
+        return;
+      }
+
       submitBtn.disabled = true; submitBtn.textContent = "Placing order…";
       try {
-        const order = await Api.placeOrderPublic({
-          table: Number(table),
-          customer: name,
-          phone,
-          method,
-          items: Cart.all().map(l => ({ id: l.id, name: l.name, qty: l.qty, price: l.price, note: l.note || "" })),
-        });
+        const order = await Api.placeOrderPublic({ table: Number(table), customer: name, phone, method, items });
         localStorage.setItem("foodhouse-lastOrder", order.code);
         Cart.clear();
         location.href = "thankyou.html";
       } catch (ex) {
         App.toast(ex.message || "Couldn't place your order. Please try again.");
-        submitBtn.disabled = false; submitBtn.textContent = `Place Order · ${App.money(total())}`;
+        resetBtn();
       }
     });
   </script>

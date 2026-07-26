@@ -2,6 +2,7 @@
    guaranteeing one restaurant can never read another's data. Public (customer)
    routes resolve the tenant from the URL slug and only expose safe data. */
 import { Router } from "express";
+import crypto from "node:crypto";
 import { q, tx } from "./db.js";
 import { auth, requireRole, hashPassword, verifyPassword, signToken } from "./auth.js";
 
@@ -49,9 +50,11 @@ async function createOrder(client, tenantId, body) {
   const total = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
   const code = await nextOrderCode(client, tenantId);
   const method = body.method || "Cash";
-  // Cash needs someone to physically collect it; UPI/Card are treated as
-  // settled the moment the order is placed.
-  const paymentCollected = method !== "Cash";
+  // Cash needs someone to physically collect it; UPI/Card (paid at the
+  // counter) are treated as settled the moment the order is placed. Razorpay
+  // is the one online method that stays uncollected until its payment is
+  // actually verified (see /public/:slug/orders/:code/razorpay/verify).
+  const paymentCollected = method !== "Cash" && method !== "Razorpay";
   // Every order belongs to the tenant's current active session (financial
   // year) — this is how each year's orders/payments/analytics stay separate.
   const sessionId = await getActiveSessionId(client, tenantId);
@@ -73,6 +76,10 @@ async function createOrder(client, tenantId, body) {
 const publicTenant = (t) => ({
   slug: t.slug, name: t.name, tagline: t.tagline, phone: t.phone, address: t.address, logo: t.logo,
   currency: t.currency, isClosed: t.is_closed, customDomain: t.custom_domain, primaryColor: t.primary_color,
+  // Safe to expose: just tells the customer app whether to offer "Pay online".
+  // The actual key id (needed to open Razorpay's checkout) is fetched per-order
+  // from the /razorpay/order endpoint below, never handed out in bulk here.
+  razorpayEnabled: !!(t.razorpay_key_id && t.razorpay_key_secret),
 });
 
 /* ==================== AUTH ==================== */
@@ -404,6 +411,62 @@ r.get("/public/:slug/orders/:code", h(loadTenant), h(async (req, res) => {
   const { rows } = await q(`${ORDERS_SELECT} WHERE o.tenant_id=$1 AND o.code=$2 GROUP BY o.id`, [req.tenant.id, req.params.code]);
   if (!rows[0]) return res.status(404).json({ error: "Order not found" });
   res.json(rows[0]);
+}));
+
+/* Razorpay, step 1: create a payment-gateway order sized to the cart total,
+   using the restaurant's own keys (every tenant bills through its own
+   Razorpay account — we never touch the money). No internal order exists
+   yet, so a customer who backs out of the payment leaves nothing behind. */
+r.post("/public/:slug/razorpay/order", h(loadTenant), h(async (req, res) => {
+  const { razorpay_key_id: keyId, razorpay_key_secret: keySecret } = req.tenant;
+  if (!keyId || !keySecret) return res.status(400).json({ error: "Online payments aren't set up for this restaurant yet" });
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  if (!items.length) return res.status(400).json({ error: "Your cart is empty" });
+  const total = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
+  const amountPaise = Math.round(total * 100);
+  if (amountPaise < 100) return res.status(400).json({ error: "Order amount is too small to pay online" });
+
+  const resp = await fetch("https://api.razorpay.com/v1/orders", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Basic " + Buffer.from(`${keyId}:${keySecret}`).toString("base64"),
+    },
+    body: JSON.stringify({ amount: amountPaise, currency: "INR", receipt: `rcpt_${Date.now()}` }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) return res.status(502).json({ error: data.error?.description || "Could not start the payment" });
+  res.json({ razorpayOrderId: data.id, amount: data.amount, currency: data.currency, keyId });
+}));
+
+/* Razorpay, step 2: verify the signature Razorpay's checkout returns to the
+   browser — an HMAC of orderId|paymentId keyed with the tenant's own secret,
+   which is what actually proves the payment happened (nothing from the
+   browser alone is trusted). Only once that checks out do we create the
+   real order, already marked paid. */
+r.post("/public/:slug/razorpay/verify", h(loadTenant), h(async (req, res) => {
+  const body = req.body || {};
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature)
+    return res.status(400).json({ error: "Missing payment details" });
+  if (req.tenant.is_closed) return res.status(403).json({ error: "This restaurant is currently closed for new orders." });
+
+  const expected = crypto
+    .createHmac("sha256", req.tenant.razorpay_key_secret)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest("hex");
+  if (expected !== razorpay_signature) return res.status(400).json({ error: "Payment verification failed" });
+
+  const order = await tx(async (c) => {
+    const o = await createOrder(c, req.tenant.id, { ...body, method: "Razorpay" });
+    await c.query(
+      `UPDATE orders SET payment_collected=true, collected_by='Razorpay', collected_at=now(),
+       razorpay_order_id=$1, razorpay_payment_id=$2 WHERE id=$3`,
+      [razorpay_order_id, razorpay_payment_id, o.id]
+    );
+    return o;
+  });
+  res.json(order);
 }));
 
 /* "My Orders" — every order this restaurant has ever received from a phone

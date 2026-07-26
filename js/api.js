@@ -102,6 +102,11 @@ const Api = (() => {
   const getOrderByCode = (code) => req(`/public/${tenantSlug()}/orders/${encodeURIComponent(code)}`);
   const myOrders = (phone) => req(`/public/${tenantSlug()}/orders?phone=${encodeURIComponent(phone)}`);
 
+  /* Razorpay online checkout: create a gateway order sized to the cart,
+     then (after the customer pays) verify + create the real order in one step. */
+  const razorpayCreateOrder = (items) => req(`/public/${tenantSlug()}/razorpay/order`, { method: "POST", body: { items } });
+  const razorpayVerifyAndPlaceOrder = (payload) => req(`/public/${tenantSlug()}/razorpay/verify`, { method: "POST", body: payload });
+
   /* Branding lookup while typing a username on the staff login page. */
   const lookupBranding = (username) => req(`/auth/lookup?username=${encodeURIComponent(username)}`);
 
@@ -177,6 +182,7 @@ const Api = (() => {
   return {
     BASE, tenantSlug, setTenantSlug, cache: () => cache,
     loadPublic, getMenuPublic, getCategoriesPublic, placeOrderPublic, getOrderByCode, myOrders, lookupBranding,
+    razorpayCreateOrder, razorpayVerifyAndPlaceOrder,
     resolveDomain, ensureTenantResolved,
     login, logout, isAuthed, currentUser, me, requireAuth, authReq,
     getMenu, saveMenuItem, deleteMenuItem, getCategories, getTables, addTable,

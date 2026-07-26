@@ -77,21 +77,28 @@
       markEl.innerHTML = App.icon("leaf", 24);
     }
     let lookupTimer;
-    document.getElementById("username").addEventListener("input", (e) => {
+    async function lookupAndApplyBrand(val) {
+      if (!val) { resetBrand(); return; }
+      try {
+        const info = await Api.lookupBranding(val);
+        if (!info) { resetBrand(); return; }
+        nameEl.textContent = info.name;
+        subEl.textContent = info.tagline || "Sign in to manage your restaurant";
+        if (info.logo) { markEl.className = "brand-mark has-logo"; markEl.innerHTML = `<img src="${info.logo}" alt="logo">`; }
+        else { markEl.className = "brand-mark"; markEl.innerHTML = App.icon("leaf", 24); }
+      } catch (e) { /* offline or bad request — keep current branding */ }
+    }
+    const usernameEl = document.getElementById("username");
+    usernameEl.addEventListener("input", (e) => {
       clearTimeout(lookupTimer);
       const val = e.target.value.trim();
       if (!val) { resetBrand(); return; }
-      lookupTimer = setTimeout(async () => {
-        try {
-          const info = await Api.lookupBranding(val);
-          if (!info) { resetBrand(); return; }
-          nameEl.textContent = info.name;
-          subEl.textContent = info.tagline || "Sign in to manage your restaurant";
-          if (info.logo) { markEl.className = "brand-mark has-logo"; markEl.innerHTML = `<img src="${info.logo}" alt="logo">`; }
-          else { markEl.className = "brand-mark"; markEl.innerHTML = App.icon("leaf", 24); }
-        } catch (e) { /* offline or bad request — keep current branding */ }
-      }, 250);
+      lookupTimer = setTimeout(() => lookupAndApplyBrand(val), 250);
     });
+    // Browsers that autofill the username on page load don't fire an "input"
+    // event, so the live-branding lookup above would never run — check once
+    // after load in case the field already has a value.
+    window.addEventListener("load", () => setTimeout(() => lookupAndApplyBrand(usernameEl.value.trim()), 300));
 
     const err = document.getElementById("err");
     const offline = document.getElementById("offline");

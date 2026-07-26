@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS tenants (
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS is_closed BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS custom_domain TEXT;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS primary_color TEXT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS razorpay_key_id TEXT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS razorpay_key_secret TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_custom_domain ON tenants(custom_domain) WHERE custom_domain IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS users (

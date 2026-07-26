@@ -316,7 +316,11 @@ r.get("/customers", auth, requireRole("owner", "manager"), h(async (req, res) =>
 /* ==================== SETTINGS ==================== */
 r.get("/settings", auth, h(async (req, res) => {
   const t = (await q("SELECT * FROM tenants WHERE id=$1", [req.user.tid])).rows[0];
-  res.json(publicTenant(t));
+  res.json({
+    ...publicTenant(t),
+    razorpayKeyId: t.razorpay_key_id || "",
+    razorpayConnected: !!(t.razorpay_key_id && t.razorpay_key_secret),
+  });
 }));
 
 r.put("/settings", auth, requireRole("owner", "manager"), h(async (req, res) => {
@@ -325,13 +329,18 @@ r.put("/settings", auth, requireRole("owner", "manager"), h(async (req, res) => 
   const set = (col, val) => { if (val !== undefined) { fields.push(`${col}=$${fields.length + 1}`); vals.push(val); } };
   set("name", b.name); set("tagline", b.tagline); set("phone", b.phone); set("logo", b.logo); set("address", b.address);
   set("is_closed", b.isClosed);
-  // Domain and brand colour are structural/ownership decisions — owner only.
+  // Domain, brand colour and payment keys are sensitive/structural — owner only.
   if (req.user.role === "owner") {
     set("primary_color", b.primaryColor);
     if (b.customDomain !== undefined) {
       const cleaned = String(b.customDomain).trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
       set("custom_domain", cleaned || null);
     }
+    if (b.razorpayKeyId !== undefined) set("razorpay_key_id", String(b.razorpayKeyId).trim() || null);
+    // The secret is never sent back to the browser, so an empty/unset value
+    // here means "leave the stored secret unchanged" — only overwrite it
+    // when the owner actually typed a new one.
+    if (b.razorpayKeySecret) set("razorpay_key_secret", String(b.razorpayKeySecret).trim());
   }
   if (!fields.length) return res.json({ ok: true });
   vals.push(req.user.tid);

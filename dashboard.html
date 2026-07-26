@@ -588,6 +588,14 @@
                   : `<p style="font-size:13px;color:var(--muted)">${s.customDomain ? `Currently: <b>${s.customDomain}</b>` : "Not set — ask the owner to add one."} (owner only)</p>`}
               </div>
               <div class="panel card">
+                <div class="panel-head"><h3>Razorpay payments</h3>${s.razorpayConnected ? `<span class="badge ready">Connected</span>` : ""}</div>
+                <p class="settings-hint" style="margin:0 0 12px">Add your Razorpay API keys to accept online payments from customers. Find these in your <b>Razorpay Dashboard → Settings → API Keys</b>.</p>
+                ${role === "owner" ? `
+                  <div class="field"><label>Key ID</label><input class="input" id="setRzpKeyId" placeholder="rzp_live_xxxxxxxxxxxx" value="${s.razorpayKeyId || ""}"></div>
+                  <div class="field" style="margin-bottom:0"><label>Key Secret</label><input class="input" type="password" id="setRzpKeySecret" placeholder="${s.razorpayConnected ? "•••••••••••• (unchanged — type to replace)" : "Enter key secret"}"></div>
+                ` : `<p style="font-size:13px;color:var(--muted)">${s.razorpayConnected ? "Razorpay is connected." : "Not connected yet — ask the owner to add API keys."} (owner only)</p>`}
+              </div>
+              <div class="panel card">
                 <div class="panel-head"><h3>Close store</h3></div>
                 <div style="display:flex;align-items:center;gap:14px">
                   <label class="switch"><input type="checkbox" id="closeStoreToggle" ${s.isClosed ? "checked" : ""}><span class="slider"></span></label>
@@ -646,6 +654,10 @@
         if (pendingLogo !== null) patch.logo = pendingLogo;
         const domainInput = document.getElementById("setDomain");
         if (domainInput) patch.customDomain = domainInput.value.trim();
+        const rzpKeyIdInput = document.getElementById("setRzpKeyId");
+        if (rzpKeyIdInput) patch.razorpayKeyId = rzpKeyIdInput.value.trim();
+        const rzpSecretInput = document.getElementById("setRzpKeySecret");
+        if (rzpSecretInput && rzpSecretInput.value.trim()) patch.razorpayKeySecret = rzpSecretInput.value.trim();
         try {
           await Api.saveSettings(patch);
         } catch (ex) { App.toast(ex.message); return; }

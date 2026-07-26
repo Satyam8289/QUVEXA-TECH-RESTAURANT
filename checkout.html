@@ -32,12 +32,8 @@
       <div class="section" style="padding-top:10px;padding-bottom:6px">
         <label style="font-size:13px;font-weight:600;color:var(--muted);display:block;margin-bottom:10px">Payment method</label>
         <div class="pay-methods" id="payMethods">
-          <button type="button" class="pay active" data-pay="UPI"><span class="pay-ico">₹</span>UPI</button>
-          <button type="button" class="pay" data-pay="Card"><span class="pay-ico">▭</span>Card</button>
           <button type="button" class="pay" data-pay="Cash"><span class="pay-ico">◎</span>Cash</button>
-        </div>
-        <div class="pay-methods" id="payMethodsOnline" style="display:none;margin-top:8px">
-          <button type="button" class="pay" data-pay="Razorpay" style="width:100%"><span class="pay-ico">🔒</span>Pay Online (Razorpay)</button>
+          <button type="button" class="pay active" data-pay="Online"><span class="pay-ico">🔒</span>Card / UPI</button>
         </div>
       </div>
 
@@ -75,7 +71,8 @@
     const known = App.getCustomer();
     if (known) { document.getElementById("name").value = known.name; document.getElementById("phone").value = known.phone; }
 
-    let method = "UPI";
+    let method = "Online";
+    let razorpayEnabled = false;
     const tableField = document.getElementById("table");
     tableField.value = App.getTableNo();
     // If the table came from scanning its QR, lock it so it can't be changed.
@@ -105,7 +102,7 @@
         const data = await Api.loadPublic();
         closed = !!data.tenant.isClosed;
         tenantName = data.tenant.name;
-        if (data.tenant.razorpayEnabled) document.getElementById("payMethodsOnline").style.display = "";
+        razorpayEnabled = !!data.tenant.razorpayEnabled;
       } catch (e) { /* keep going, backend errors surface on submit */ }
       document.getElementById("brand").innerHTML = App.brandBar({ back: "cart.html", subtitle: "Checkout" });
       if (closed) {
@@ -136,7 +133,7 @@
       const submitBtn = document.querySelector('#dock button');
       const resetBtn = () => { submitBtn.disabled = false; submitBtn.textContent = `Place Order · ${App.money(total())}`; };
 
-      if (method === "Razorpay") {
+      if (method === "Online" && razorpayEnabled) {
         submitBtn.disabled = true; submitBtn.textContent = "Starting payment…";
         try {
           await loadRazorpayScript();
@@ -178,9 +175,12 @@
         return;
       }
 
+      // Fallback for restaurants that haven't connected Razorpay yet: treat
+      // Card/UPI like the counter handles it today — collected on the spot.
+      const orderMethod = method === "Online" ? "Card/UPI" : method;
       submitBtn.disabled = true; submitBtn.textContent = "Placing order…";
       try {
-        const order = await Api.placeOrderPublic({ table: Number(table), customer: name, phone, method, items });
+        const order = await Api.placeOrderPublic({ table: Number(table), customer: name, phone, method: orderMethod, items });
         localStorage.setItem("foodhouse-lastOrder", order.code);
         Cart.clear();
         location.href = "thankyou.html";

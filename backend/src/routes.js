@@ -50,11 +50,10 @@ async function createOrder(client, tenantId, body) {
   const total = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
   const code = await nextOrderCode(client, tenantId);
   const method = body.method || "Cash";
-  // Cash needs someone to physically collect it; UPI/Card (paid at the
-  // counter) are treated as settled the moment the order is placed. Razorpay
-  // is the one online method that stays uncollected until its payment is
-  // actually verified (see /public/:slug/orders/:code/razorpay/verify).
-  const paymentCollected = method !== "Cash" && method !== "Razorpay";
+  // Cash needs someone to physically collect it; every other method (Card/UPI,
+  // whether paid at the counter or verified via Razorpay) is settled already —
+  // the Razorpay verify route below overrides this explicitly regardless.
+  const paymentCollected = method !== "Cash";
   // Every order belongs to the tenant's current active session (financial
   // year) — this is how each year's orders/payments/analytics stay separate.
   const sessionId = await getActiveSessionId(client, tenantId);
@@ -458,7 +457,9 @@ r.post("/public/:slug/razorpay/verify", h(loadTenant), h(async (req, res) => {
   if (expected !== razorpay_signature) return res.status(400).json({ error: "Payment verification failed" });
 
   const order = await tx(async (c) => {
-    const o = await createOrder(c, req.tenant.id, { ...body, method: "Razorpay" });
+    // Shown to the owner as "Card/UPI" like any other online payment — the
+    // collected_by='Razorpay' set below is what marks it as auto-verified.
+    const o = await createOrder(c, req.tenant.id, { ...body, method: "Card/UPI" });
     await c.query(
       `UPDATE orders SET payment_collected=true, collected_by='Razorpay', collected_at=now(),
        razorpay_order_id=$1, razorpay_payment_id=$2 WHERE id=$3`,

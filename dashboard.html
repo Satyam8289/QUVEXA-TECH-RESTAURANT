@@ -242,7 +242,7 @@
         || `<p style="color:var(--muted);font-size:13px">No sales yet.</p>`;
     }
     function payData(orders = ORDERS) {
-      const m = { UPI: 0, Card: 0, Cash: 0 };
+      const m = { "Card/UPI": 0, Cash: 0 };
       orders.forEach((o) => { m[o.method] = (m[o.method] || 0) + o.total; });
       return m;
     }
@@ -396,12 +396,12 @@
       if (payPendingOnly) orders = orders.filter((o) => !o.paymentCollected);
       orders = filterByDateRange(orders, payDateFilter);
       const pd = payData(orders), total = Object.values(pd).reduce((a, b) => a + b, 0);
-      const methodCards = [["UPI", "card"], ["Card", "card"], ["Cash", "revenue"]].map(([k, ic]) =>
+      const methodCards = [["Card/UPI", "card"], ["Cash", "revenue"]].map(([k, ic]) =>
         `<div class="kpi card"><div class="kpi-ic">${App.icon(ic, 20)}</div><div class="lbl">${k} collected</div><div class="val">${App.money(pd[k] || 0)}</div></div>`).join("");
-      const methodPills = ["all", "UPI", "Card", "Cash"].map((m) =>
+      const methodPills = ["all", "Card/UPI", "Cash"].map((m) =>
         `<button class="pill ${payFilter === m ? "active" : ""}" data-pf="${m}">${m === "all" ? "All methods" : m}</button>`).join("");
       view.innerHTML = viewHead(`${orders.length} transaction${orders.length === 1 ? "" : "s"} · ${App.money(total)} collected`, "")
-        + `<div class="kpi-grid">
+        + `<div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
             <div class="kpi card kpi-hero"><div class="kpi-ic">${App.icon("revenue", 20)}</div><div class="lbl">Total collected</div><div class="val">${App.money(total)}</div></div>
             ${methodCards}</div>`
         + dateRangeFilterHTML(payDateFilter, "payments")

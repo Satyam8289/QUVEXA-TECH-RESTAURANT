@@ -22,11 +22,26 @@
     .bill-totals .row.grand { color:var(--ink); font-weight:700; font-size:17px; padding-top:10px; margin-top:6px; border-top:1px dashed var(--line); }
     .bill-foot { text-align:center; margin-top:20px; color:var(--muted); font-size:12px; }
     .bill-actions { display:flex; gap:10px; padding:0 18px 24px; }
+    /* Thermal receipt printers (EZO / standard restaurant billing machines)
+       are almost always 80mm (3") roll paper — @page here targets that width
+       so "Print" from this page goes straight to the receipt printer at the
+       right size, no manual scaling needed. */
     @media print {
-      body { background:#fff; }
+      @page { size: 80mm auto; margin: 0; }
+      html, body { width: 80mm; background:#fff; }
       .no-print { display:none !important; }
-      .bill-paper { margin:0; border:none; box-shadow:none; }
-      .phone { box-shadow:none; max-width:none; }
+      .phone { box-shadow:none; max-width:80mm; width:80mm; margin:0; }
+      .bill-paper { margin:0; border:none; box-shadow:none; padding:6px 8px; border-radius:0; }
+      .bill-head { padding-bottom:8px; margin-bottom:8px; }
+      .bill-head h2 { font-size:15px; }
+      .bill-head small { font-size:10.5px; }
+      .bill-meta { font-size:10.5px; margin-bottom:8px; }
+      .bill-table { font-size:11px; }
+      .bill-table th { font-size:9px; padding-bottom:5px; }
+      .bill-table td { padding:4px 0; }
+      .bill-totals .row { font-size:11px; padding:2px 0; }
+      .bill-totals .row.grand { font-size:13px; padding-top:6px; margin-top:4px; }
+      .bill-foot { font-size:10px; margin-top:10px; }
     }
   </style>
 </head>

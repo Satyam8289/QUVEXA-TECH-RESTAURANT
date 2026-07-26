@@ -75,10 +75,7 @@
 
           <div class="field" style="margin:14px 0 12px">
             <label>Payment</label>
-            <div class="pay-methods" id="posPay">
-              <button type="button" class="pay active" data-pay="Cash"><span class="pay-ico">◎</span>Cash</button>
-              <button type="button" class="pay" data-pay="Card/UPI"><span class="pay-ico">🔒</span>Card / UPI</button>
-            </div>
+            <div class="pay-methods" id="posPay"></div>
           </div>
 
           <button class="btn btn-block btn-lg" id="posPlace">Place Order</button>
@@ -92,6 +89,9 @@
   <script src="js/app.js"></script>
   <script>
     document.getElementById("sIco").innerHTML = App.icon("search",18);
+    document.getElementById("posPay").innerHTML = `
+      <button type="button" class="pay active" data-pay="Cash"><span class="pay-ico">${App.icon("revenue", 17)}</span>Cash</button>
+      <button type="button" class="pay" data-pay="Card/UPI"><span class="pay-ico">${App.icon("card", 17)}</span>Card / UPI</button>`;
 
     let CATS = [], MENU = [], TABLES = [];
     let activeCat = "all", query = "", method = "Cash";

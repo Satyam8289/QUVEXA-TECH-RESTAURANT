@@ -22,13 +22,7 @@
       <div class="card" style="width:100%;padding:16px;text-align:left" id="recap"></div>
 
       <div style="width:100%;display:flex;flex-direction:column;gap:10px;margin-top:22px">
-        <a class="btn btn-wa btn-block btn-lg" id="waBtn" target="_blank" rel="noopener">
-          <span id="waIco"></span> Send order on WhatsApp
-        </a>
-        <div style="display:flex;gap:10px">
-          <a class="btn btn-ghost btn-block" id="billBtn" target="_blank" rel="noopener">${''}<span id="billIco"></span> Download Bill</a>
-          <a class="btn btn-ghost btn-block" id="waSelfBtn" target="_blank" rel="noopener"><span id="waSelfIco"></span> To my WhatsApp</a>
-        </div>
+        <a class="btn btn-ghost btn-block btn-lg" id="billBtn" target="_blank" rel="noopener"><span id="billIco"></span> Download Bill</a>
         <a class="btn btn-block btn-lg" id="trackBtn" href="tracking.html">Track my order</a>
         <div style="display:flex;gap:10px">
           <a class="btn btn-ghost btn-block" href="orders.html">My Orders</a>
@@ -44,8 +38,6 @@
   <script src="js/app.js"></script>
   <script>
     document.getElementById("badge").innerHTML = App.icon("check", 46);
-    document.getElementById("waIco").innerHTML = App.icon("whatsapp", 20);
-    document.getElementById("waSelfIco").innerHTML = App.icon("whatsapp", 18);
     document.getElementById("billIco").innerHTML = App.icon("clipboard", 18);
 
     async function main() {
@@ -62,8 +54,6 @@
                <span>${it.qty} × ${it.name}</span><span>${App.money(it.price * it.qty)}</span></div>`).join("") +
           `<div style="display:flex;justify-content:space-between;padding-top:10px;margin-top:6px;border-top:1px dashed var(--line);font-weight:700">
              <span>Table ${order.table ?? "—"} · ${order.method}</span><span>${App.money(order.total)}</span></div>`;
-        document.getElementById("waBtn").href = App.whatsappOrderLink(order);
-        document.getElementById("waSelfBtn").href = App.whatsappOrderLink(order, order.phone);
         document.getElementById("billBtn").href = `bill.html?code=${encodeURIComponent(order.code)}&r=${Api.tenantSlug()}`;
       } catch (e) {
         location.href = "index.html";

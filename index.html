@@ -66,14 +66,22 @@
     document.getElementById("hrating").innerHTML = `${App.icon("star",15)} 4.8 · 2,400+ ratings · Pure veg options`;
     document.getElementById("f1").innerHTML = App.icon("clock", 22);
     document.getElementById("f2").innerHTML = App.icon("whatsapp", 22);
-    document.getElementById("f3").innerHTML = App.icon("revenue", 22);
+    document.getElementById("f3").innerHTML = App.icon("rupee", 22);
     document.getElementById("pin").innerHTML = App.icon("pin", 22);
     document.querySelectorAll(".flip").forEach(s => s.style.transform = "rotate(180deg)");
 
-    // Table number
+    // Table number — locked read-only when it arrived via a table's QR code
+    // (see the ?table= deep-link handling in js/app.js), same as checkout.
     const tableInput = document.getElementById("table");
     tableInput.value = App.getTableNo();
-    tableInput.addEventListener("input", () => { App.setTableNo(tableInput.value); App.setTableLocked(false); });
+    if (App.isTableLocked() && App.getTableNo()) {
+      tableInput.readOnly = true;
+      tableInput.style.background = "var(--green-50)";
+      tableInput.insertAdjacentHTML("afterend",
+        `<small style="color:var(--green-700);font-weight:600;font-size:12px;margin-top:6px;display:inline-flex;align-items:center;gap:5px">${App.icon("check",14)} Auto-detected from your table's QR code</small>`);
+    } else {
+      tableInput.addEventListener("input", () => { App.setTableNo(tableInput.value); App.setTableLocked(false); });
+    }
     document.getElementById("viewMenu").addEventListener("click", () => {
       if (tableInput.value) App.setTableNo(tableInput.value);
     });

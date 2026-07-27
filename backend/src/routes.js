@@ -294,6 +294,20 @@ r.patch("/staff/:id/password", auth, requireRole("owner"), h(async (req, res) =>
   res.json({ ok: true });
 }));
 
+/* Self-service: anyone (owner included — the owner has no one "above" them
+   to reset it for them) can change their OWN password, but must prove they
+   know the current one first, unlike the owner-resets-someone-else route
+   above which trusts the owner's judgement instead. */
+r.patch("/me/password", auth, h(async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!newPassword || newPassword.length < 4) return res.status(400).json({ error: "New password must be at least 4 characters" });
+  const u = (await q("SELECT password_hash FROM users WHERE id=$1", [req.user.uid])).rows[0];
+  if (!u || !(await verifyPassword(currentPassword || "", u.password_hash)))
+    return res.status(401).json({ error: "Current password is incorrect" });
+  await q("UPDATE users SET password_hash=$1 WHERE id=$2", [await hashPassword(newPassword), req.user.uid]);
+  res.json({ ok: true });
+}));
+
 r.delete("/staff/:id", auth, requireRole("owner"), h(async (req, res) => {
   if (req.params.id === req.user.uid) return res.status(400).json({ error: "You can't remove your own account" });
   await q("DELETE FROM users WHERE id=$1 AND tenant_id=$2 AND role<>'owner'", [req.params.id, req.user.tid]);

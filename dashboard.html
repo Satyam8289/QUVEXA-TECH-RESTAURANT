@@ -492,26 +492,35 @@
     const staffModalBack = document.getElementById("staffModalBack");
     function openStaffModal(id) {
       const s = STAFF.find((x) => x.id === id);
+      const isSelf = id === (App.currentUser() || {}).id;
       document.getElementById("staffModal").innerHTML = `
-        <h3>${s.name}</h3>
+        <h3>${s.name}${isSelf ? " (you)" : ""}</h3>
         <div class="field"><label>Login username</label><input class="input" value="${s.username}" readonly style="background:var(--cream)"></div>
         <div class="field"><label>Role</label><input class="input" value="${s.role[0].toUpperCase()+s.role.slice(1)} · ${s.shift || ""}" readonly style="background:var(--cream)"></div>
-        <div class="field" style="margin-bottom:0"><label>Set a new password</label><input class="input" id="newPass" type="text" placeholder="Type a new password to reset it"></div>
-        <p style="font-size:11.5px;color:var(--muted);margin-top:8px">Passwords are securely hashed and can't be viewed — set a new one here and share it with ${s.name.split(" ")[0]}.</p>
+        ${isSelf ? `
+          <div class="field"><label>Current password</label><input class="input" id="curPass" type="password" placeholder="Enter your current password"></div>
+          <div class="field" style="margin-bottom:0"><label>New password</label><input class="input" id="newPass" type="text" placeholder="Type your new password"></div>
+          <p style="font-size:11.5px;color:var(--muted);margin-top:8px">You're changing your own login password.</p>
+        ` : `
+          <div class="field" style="margin-bottom:0"><label>Set a new password</label><input class="input" id="newPass" type="text" placeholder="Type a new password to reset it"></div>
+          <p style="font-size:11.5px;color:var(--muted);margin-top:8px">Passwords are securely hashed and can't be viewed — set a new one here and share it with ${s.name.split(" ")[0]}.</p>
+        `}
         <div id="staffModalMsg"></div>
         <div class="modal-foot">
           <button type="button" class="btn btn-ghost" id="staffModalClose" style="flex:1">Close</button>
-          ${s.role !== "owner" ? `<button type="button" class="btn" id="staffModalReset" style="flex:1">Reset password</button>` : ""}
+          <button type="button" class="btn" id="staffModalReset" style="flex:1">${isSelf ? "Change password" : "Reset password"}</button>
         </div>
         ${s.role !== "owner" ? `<button type="button" class="btn btn-ghost" id="staffModalDelete" style="width:100%;margin-top:10px;color:var(--danger)">Remove this login</button>` : ""}`;
       staffModalBack.classList.add("open");
       document.getElementById("staffModalClose").addEventListener("click", () => staffModalBack.classList.remove("open"));
-      const resetBtn = document.getElementById("staffModalReset");
-      if (resetBtn) resetBtn.addEventListener("click", async () => {
+      document.getElementById("staffModalReset").addEventListener("click", async () => {
         const pw = document.getElementById("newPass").value;
         if (!pw || pw.length < 4) { document.getElementById("staffModalMsg").innerHTML = `<p style="color:var(--danger);font-size:12px;margin-top:6px">Password must be at least 4 characters</p>`; return; }
-        try { await Api.resetStaffPassword(id, pw); App.toast("Password updated"); staffModalBack.classList.remove("open"); }
-        catch (e) { document.getElementById("staffModalMsg").innerHTML = `<p style="color:var(--danger);font-size:12px;margin-top:6px">${e.message}</p>`; }
+        try {
+          if (isSelf) await Api.changeMyPassword(document.getElementById("curPass").value, pw);
+          else await Api.resetStaffPassword(id, pw);
+          App.toast("Password updated"); staffModalBack.classList.remove("open");
+        } catch (e) { document.getElementById("staffModalMsg").innerHTML = `<p style="color:var(--danger);font-size:12px;margin-top:6px">${e.message}</p>`; }
       });
       const delBtn = document.getElementById("staffModalDelete");
       if (delBtn) delBtn.addEventListener("click", async () => {

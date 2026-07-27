@@ -169,6 +169,7 @@ const Api = (() => {
   const addStaff = (member) => authReq("/staff", { method: "POST", body: member });
   const deleteStaff = (id) => authReq(`/staff/${id}`, { method: "DELETE" });
   const resetStaffPassword = (id, password) => authReq(`/staff/${id}/password`, { method: "PATCH", body: { password } });
+  const changeMyPassword = (currentPassword, newPassword) => authReq(`/me/password`, { method: "PATCH", body: { currentPassword, newPassword } });
 
   const getSettings = () => authReq("/settings");
   const saveSettings = (patch) => authReq("/settings", { method: "PUT", body: patch });
@@ -193,7 +194,7 @@ const Api = (() => {
     getMenu, saveMenuItem, deleteMenuItem, getCategories, getTables, addTable,
     getOrders, createOrder, updateOrderStatus, collectPayment,
     getSessions, createSession, activateSession,
-    getStaff, addStaff, deleteStaff, resetStaffPassword, getSettings, saveSettings, getStats, getCustomers,
+    getStaff, addStaff, deleteStaff, resetStaffPassword, changeMyPassword, getSettings, saveSettings, getStats, getCustomers,
     money, brandName, brandTagline, brandLogo, brandPhone,
   };
 })();

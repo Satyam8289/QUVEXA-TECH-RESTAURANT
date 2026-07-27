@@ -553,7 +553,7 @@
       const role = (App.currentUser() || { role: "owner" }).role;
       const customerLink = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}index.html?r=${s.slug}`;
       const logoInner = s.logo ? `<img src="${s.logo}" alt="logo"/>` : App.icon("leaf", 30);
-      view.innerHTML = viewHead("Manage your restaurant profile, logo and customer link", "")
+      view.innerHTML = viewHead("Manage your restaurant profile, logo and customer link", `<button class="btn btn-lg" id="saveSettings">Save changes</button>`)
         + `<div class="settings-grid">
             <div class="panel card">
               <div class="panel-head"><h3>Restaurant profile</h3></div>
@@ -604,7 +604,6 @@
               </div>
             </div>
           </div>
-          <div style="margin-top:20px"><button class="btn btn-lg" id="saveSettings">Save changes</button></div>
           <div class="panel card" style="margin-top:20px">
             <div class="panel-head"><h3>Financial years</h3><span class="link" id="fySub"></span></div>
             <p class="settings-hint" style="margin:0 0 14px">Orders, payments and analytics are kept separate for each year. Menu, stock and customer/messaging data carry over automatically — nothing resets.</p>

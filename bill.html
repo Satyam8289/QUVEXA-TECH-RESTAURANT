@@ -94,8 +94,7 @@
           </div>`;
 
         document.getElementById("actions").innerHTML = `
-          <button class="btn btn-block btn-lg" id="printBtn">${App.icon("clipboard",18)} Download / Print</button>
-          <a class="btn btn-wa btn-block btn-lg" target="_blank" rel="noopener" href="${App.whatsappOrderLink(order, order.phone)}">${App.icon("whatsapp",18)} WhatsApp</a>`;
+          <button class="btn btn-block btn-lg" id="printBtn">${App.icon("clipboard",18)} Download / Print</button>`;
         document.getElementById("printBtn").addEventListener("click", () => window.print());
       } catch (e) {
         document.getElementById("content").innerHTML =

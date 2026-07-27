@@ -79,8 +79,6 @@
     if (App.isTableLocked() && App.getTableNo()) {
       tableField.readOnly = true;
       tableField.style.background = "var(--green-50)";
-      tableField.insertAdjacentHTML("afterend",
-        `<small style="color:var(--green-700);font-weight:600;font-size:12px;margin-top:6px;display:inline-flex;align-items:center;gap:5px">${App.icon("check",14)} Auto-detected from your table's QR code</small>`);
     }
 
     document.querySelectorAll(".pay").forEach(p =>

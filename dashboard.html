@@ -396,7 +396,7 @@
       if (payPendingOnly) orders = orders.filter((o) => !o.paymentCollected);
       orders = filterByDateRange(orders, payDateFilter);
       const pd = payData(orders), total = Object.values(pd).reduce((a, b) => a + b, 0);
-      const methodCards = [["Card/UPI", "card"], ["Cash", "revenue"]].map(([k, ic]) =>
+      const methodCards = [["Card/UPI", "card"], ["Cash", "rupee"]].map(([k, ic]) =>
         `<div class="kpi card"><div class="kpi-ic">${App.icon(ic, 20)}</div><div class="lbl">${k} collected</div><div class="val">${App.money(pd[k] || 0)}</div></div>`).join("");
       const methodPills = ["all", "Card/UPI", "Cash"].map((m) =>
         `<button class="pill ${payFilter === m ? "active" : ""}" data-pf="${m}">${m === "all" ? "All methods" : m}</button>`).join("");

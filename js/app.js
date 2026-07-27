@@ -37,6 +37,7 @@ const App = (() => {
     message: '<path d="M4 5h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 10h8M8 13.5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
     send:    '<path d="M4 12 20 4l-6.5 16-2.7-7L4 12Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>',
     lock:    '<rect x="4.5" y="10.5" width="15" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="15" r="1.6"/>',
+    rupee:   '<text x="12" y="17.5" text-anchor="middle" font-size="16" font-weight="700" fill="currentColor" font-family="Georgia, \'Times New Roman\', serif">₹</text>',
   };
 
   /* ---- Brand mark (uploaded logo, or leaf icon fallback) ---- */

@@ -37,7 +37,17 @@
         <div class="field"><label>Stock</label><input class="input" id="f-stock" type="number" min="0" required /></div>
         <div class="field"><label>Category</label><select class="input" id="f-cat"></select></div>
         <div class="field"><label>Rating</label><input class="input" id="f-rating" type="number" min="0" max="5" step="0.1" value="4.5" /></div>
-        <div class="field full"><label>Image URL</label><input class="input" id="f-image" placeholder="https://…  (leave blank for a branded placeholder)" /></div>
+        <div class="field full">
+          <label>Photo</label>
+          <div class="logo-uploader" style="margin-bottom:10px">
+            <div class="logo-preview" id="dishPreview" style="width:56px;height:56px"></div>
+            <div>
+              <label class="upload-btn">Upload photo<input type="file" id="dishImageInput" accept="image/*" hidden></label>
+              <div class="settings-hint">Or paste an image URL below · under 1.5 MB.</div>
+            </div>
+          </div>
+          <input class="input" id="f-image" placeholder="https://…  (leave blank for a branded placeholder)" />
+        </div>
         <div class="field full"><label>Type</label>
           <div class="veg-choice">
             <button type="button" data-veg="true" class="active">🟢 Veg</button>
@@ -115,6 +125,29 @@
     }
 
     const modal = document.getElementById("modalBack");
+    const dishPreview = document.getElementById("dishPreview");
+    let pendingDishImage = null; // data URL staged for upload, or null = use the URL field as-is
+
+    function renderDishPreview(url) {
+      dishPreview.innerHTML = url ? `<img src="${url}" alt="preview" onerror="App.imgFallback(this)"/>` : App.icon("cutlery", 22);
+    }
+    document.getElementById("dishImageInput").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 1.5 * 1024 * 1024) { App.toast("Please use an image under 1.5 MB"); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        pendingDishImage = reader.result;
+        document.getElementById("f-image").value = "";
+        renderDishPreview(pendingDishImage);
+      };
+      reader.readAsDataURL(file);
+    });
+    document.getElementById("f-image").addEventListener("input", (e) => {
+      pendingDishImage = null; // typing a URL overrides any staged upload
+      renderDishPreview(e.target.value.trim());
+    });
+
     function openModal(id) {
       const m = id ? MENU.find((x) => x.id === id) : null;
       document.getElementById("modalTitle").textContent = m ? "Edit dish" : "Add dish";
@@ -126,6 +159,8 @@
       document.getElementById("f-cat").value = m ? m.category : (CATS[0] && CATS[0].slug);
       document.getElementById("f-rating").value = m ? (m.rating || 4.5) : 4.5;
       document.getElementById("f-image").value = m ? (m.image || "") : "";
+      pendingDishImage = null;
+      renderDishPreview(m ? m.image : "");
       vegChoice = m ? !!m.veg : true;
       document.querySelectorAll(".veg-choice button").forEach((x) => x.classList.toggle("active", (x.dataset.veg === "true") === vegChoice));
       modal.classList.add("open");
@@ -137,7 +172,22 @@
     const PLACEHOLDER = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=70";
     document.getElementById("itemForm").addEventListener("submit", async (e) => {
       e.preventDefault();
+      const submitBtn = e.target.querySelector('button[type="submit"]');
       const id = document.getElementById("f-id").value || undefined;
+
+      let image = document.getElementById("f-image").value.trim();
+      if (pendingDishImage) {
+        submitBtn.disabled = true; submitBtn.textContent = "Uploading photo…";
+        try {
+          const res = await Api.uploadImage(pendingDishImage, "menu");
+          image = res.url;
+        } catch (ex) {
+          if (ex.message === "R2_NOT_CONFIGURED") image = pendingDishImage; // local dev fallback
+          else { App.toast(ex.message || "Photo upload failed"); submitBtn.disabled = false; submitBtn.textContent = "Save dish"; return; }
+        }
+        submitBtn.textContent = "Save dish";
+      }
+
       const item = {
         id,
         name: document.getElementById("f-name").value.trim(),
@@ -146,10 +196,10 @@
         stock: Number(document.getElementById("f-stock").value),
         category: document.getElementById("f-cat").value,
         rating: Number(document.getElementById("f-rating").value) || 4.5,
-        image: document.getElementById("f-image").value.trim() || PLACEHOLDER,
+        image: image || PLACEHOLDER,
         veg: vegChoice,
       };
-      if (!item.name) { App.toast("Name is required"); return; }
+      if (!item.name) { App.toast("Name is required"); submitBtn.disabled = false; return; }
       try {
         const res = await Api.saveMenuItem(item);
         if (id) { const idx = MENU.findIndex((m) => m.id === id); MENU[idx] = { ...MENU[idx], ...item }; }
@@ -158,6 +208,7 @@
         closeModal();
         renderGrid();
       } catch (ex) { App.toast(ex.message); }
+      submitBtn.disabled = false;
     });
 
     async function main() {

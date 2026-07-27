@@ -389,6 +389,10 @@ r.put("/settings", auth, requireRole("owner", "manager"), h(async (req, res) => 
   vals.push(req.user.tid);
   try {
     await q(`UPDATE tenants SET ${fields.join(", ")} WHERE id=$${vals.length}`, vals);
+    // Closing the store means the dining room is being cleared for the day —
+    // free up every table rather than leaving stale "occupied" statuses for
+    // whenever the restaurant reopens.
+    if (b.isClosed === true) await q("UPDATE restaurant_tables SET status='free' WHERE tenant_id=$1", [req.user.tid]);
   } catch (e) {
     if (e.code === "23505") return res.status(409).json({ error: "That domain is already linked to another restaurant" });
     throw e;

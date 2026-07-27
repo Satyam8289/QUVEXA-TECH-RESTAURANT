@@ -651,13 +651,28 @@
           phone: document.getElementById("setPhone").value.trim(),
           isClosed: document.getElementById("closeStoreToggle").checked,
         };
-        if (pendingLogo !== null) patch.logo = pendingLogo;
         const domainInput = document.getElementById("setDomain");
         if (domainInput) patch.customDomain = domainInput.value.trim();
         const rzpKeyIdInput = document.getElementById("setRzpKeyId");
         if (rzpKeyIdInput) patch.razorpayKeyId = rzpKeyIdInput.value.trim();
         const rzpSecretInput = document.getElementById("setRzpKeySecret");
         if (rzpSecretInput && rzpSecretInput.value.trim()) patch.razorpayKeySecret = rzpSecretInput.value.trim();
+        if (pendingLogo !== null) {
+          // Upload to Cloudflare R2 so the logo isn't stored inline as a huge
+          // base64 blob in Postgres; falls back to the old inline storage if
+          // R2 isn't configured (e.g. local dev with no R2 account).
+          if (pendingLogo === "") {
+            patch.logo = "";
+          } else {
+            try {
+              const { url } = await Api.uploadImage(pendingLogo, "logo");
+              patch.logo = url;
+            } catch (ex) {
+              if (ex.message !== "R2_NOT_CONFIGURED") { App.toast(ex.message || "Logo upload failed"); return; }
+              patch.logo = pendingLogo;
+            }
+          }
+        }
         try {
           await Api.saveSettings(patch);
         } catch (ex) { App.toast(ex.message); return; }

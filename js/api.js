@@ -110,6 +110,11 @@ const Api = (() => {
   /* Branding lookup while typing a username on the staff login page. */
   const lookupBranding = (username) => req(`/auth/lookup?username=${encodeURIComponent(username)}`);
 
+  /* Image upload → Cloudflare R2 (see backend/src/r2.js). Returns a public
+     URL string. Callers should fall back to storing the raw data URL when
+     this rejects with R2_NOT_CONFIGURED (local dev without R2 keys). */
+  const uploadImage = (dataUrl, folder) => authReq("/uploads/image", { method: "POST", body: { dataUrl, folder } });
+
   /* ==================== AUTH (staff) ==================== */
   async function login(username, password) {
     const data = await req("/auth/login", { method: "POST", body: { username, password } });
@@ -182,7 +187,7 @@ const Api = (() => {
   return {
     BASE, tenantSlug, setTenantSlug, cache: () => cache,
     loadPublic, getMenuPublic, getCategoriesPublic, placeOrderPublic, getOrderByCode, myOrders, lookupBranding,
-    razorpayCreateOrder, razorpayVerifyAndPlaceOrder,
+    razorpayCreateOrder, razorpayVerifyAndPlaceOrder, uploadImage,
     resolveDomain, ensureTenantResolved,
     login, logout, isAuthed, currentUser, me, requireAuth, authReq,
     getMenu, saveMenuItem, deleteMenuItem, getCategories, getTables, addTable,

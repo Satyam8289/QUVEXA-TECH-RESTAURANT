@@ -5,6 +5,7 @@ import { Router } from "express";
 import crypto from "node:crypto";
 import { q, tx } from "./db.js";
 import { auth, requireRole, hashPassword, verifyPassword, signToken } from "./auth.js";
+import { uploadDataUrlToR2, r2Configured } from "./r2.js";
 
 const r = Router();
 const h = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -317,6 +318,20 @@ r.get("/customers", auth, requireRole("owner", "manager"), h(async (req, res) =>
     ORDER BY "lastVisit" DESC
   `, [req.user.tid]);
   res.json(rows);
+}));
+
+/* ==================== UPLOADS ==================== */
+/* Images (logo, etc.) go to Cloudflare R2 instead of sitting inline as
+   base64 in Postgres — see backend/src/r2.js. Falls back with a clear
+   error when R2 isn't configured; callers should keep the old inline-base64
+   path as a fallback for local dev (see dashboard.html's logo uploader). */
+r.post("/uploads/image", auth, requireRole("owner", "manager"), h(async (req, res) => {
+  if (!r2Configured) return res.status(501).json({ error: "R2_NOT_CONFIGURED" });
+  const { dataUrl, folder } = req.body || {};
+  if (!dataUrl) return res.status(400).json({ error: "Missing image data" });
+  const safeFolder = /^[a-z0-9-]+$/i.test(folder || "") ? folder : "misc";
+  const url = await uploadDataUrlToR2(dataUrl, `${req.user.tid}/${safeFolder}`);
+  res.json({ url });
 }));
 
 /* ==================== SETTINGS ==================== */

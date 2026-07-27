@@ -68,6 +68,14 @@ async function createOrder(client, tenantId, body) {
       `INSERT INTO order_items (order_id, menu_item_id, name, price, qty, note) VALUES ($1,$2,$3,$4,$5,$6)`,
       [order.id, it.id || null, it.name, it.price, it.qty, it.note || null]
     );
+    // Never let stock go negative — a race between two customers ordering the
+    // last few portions at once just clamps at 0 rather than erroring out.
+    if (it.id) {
+      await client.query(
+        `UPDATE menu_items SET stock = GREATEST(0, stock - $1) WHERE id=$2 AND tenant_id=$3`,
+        [Number(it.qty) || 0, it.id, tenantId]
+      );
+    }
   }
   if (table) await client.query("UPDATE restaurant_tables SET status='occupied' WHERE tenant_id=$1 AND number=$2", [tenantId, table]);
   return order;

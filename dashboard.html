@@ -376,7 +376,7 @@
       bindChartFilters();
     }
 
-    let ordersFilter = "all", ordersDateFilter = "all";
+    let ordersFilter = "all", ordersDateFilter = "today";
     function renderOrders() {
       const pills = ["all", ...STATUSES].map((f) =>
         `<button class="pill ${f === ordersFilter ? "active" : ""}" data-filter="${f}">${f === "all" ? "All" : f[0].toUpperCase() + f.slice(1)}</button>`).join("");
@@ -389,7 +389,7 @@
       bindDateRangeFilters();
     }
 
-    let payFilter = "all", payPendingOnly = false, payDateFilter = "all";
+    let payFilter = "all", payPendingOnly = false, payDateFilter = "today";
     function renderPayments() {
       let orders = ORDERS;
       if (payFilter !== "all") orders = orders.filter((o) => o.method === payFilter);

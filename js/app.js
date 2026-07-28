@@ -266,8 +266,9 @@ App.setNotifDot = (show) => { const d = document.getElementById("tbDot"); if (d)
    Here we just lock the table number when it arrives via a table QR. */
 (function () {
   const table = new URLSearchParams(location.search).get("table");
-  // Scanning a table's QR is unambiguously a dine-in order.
-  if (table) { App.setTableNo(table); App.setTableLocked(true); App.setOrderType("dine-in"); return; }
+  // A table QR pins which table they're at, but not how they're ordering —
+  // someone seated may still want a parcel, so the landing page asks.
+  if (table) { App.setTableNo(table); App.setTableLocked(true); return; }
   // Reaching the landing page WITHOUT a ?table= means this visit didn't come
   // from a table QR. Release any lock left over from an earlier scan —
   // otherwise that device stays pinned to dine-in forever and the customer

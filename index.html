@@ -45,7 +45,7 @@
         <p style="color:var(--muted);font-size:13.5px;margin-bottom:18px">Pick one so we know where to bring your food.</p>
         <button type="button" class="type-opt" data-type="dine-in">
           <span class="type-ico" id="tiDine"></span>
-          <span><b>Dine-in</b><small>Eating at a table here</small></span>
+          <span><b>Dine-in</b><small id="dineSub">Eating at a table here</small></span>
         </button>
         <button type="button" class="type-opt" data-type="takeaway" id="takeawayOpt">
           <span class="type-ico" id="tiCar"></span>
@@ -97,25 +97,20 @@
     } else {
       tableInput.addEventListener("input", () => { App.setTableNo(tableInput.value); App.setTableLocked(false); });
     }
-    /* Order type. Arriving from a table QR settles it (dine-in, table already
-       known); otherwise "View Menu" asks first, since takeaway/car service
-       needs a vehicle number and prepayment instead of a table. */
+    /* Order type is always asked on "View Menu" — even after scanning a table
+       QR, since someone sitting at a table may still want a parcel. The
+       scanned table is remembered either way; it's simply unused if they
+       pick takeaway, which has no table at all. */
     const typeBack = document.getElementById("typeBack");
     const cameFromTableQR = App.isTableLocked() && App.getTableNo();
     let razorpayReady = false;
 
     document.getElementById("tiDine").innerHTML = App.icon("dinein", 22);
     document.getElementById("tiCar").innerHTML = App.icon("car", 22);
-    if (cameFromTableQR) App.setOrderType("dine-in");
-    applyTypeToForm();
-
-    function applyTypeToForm() {
-      // A takeaway order has no table, so hide the field entirely.
-      document.getElementById("tableField").style.display = App.isTakeaway() ? "none" : "";
-    }
+    document.getElementById("tableField").style.display = App.isTakeaway() ? "none" : "";
+    if (cameFromTableQR) document.getElementById("dineSub").textContent = `Eating here at table ${App.getTableNo()}`;
 
     document.getElementById("viewMenu").addEventListener("click", (e) => {
-      if (cameFromTableQR) { App.setTableNo(tableInput.value); return; }
       e.preventDefault();
       typeBack.style.display = "flex";
     });
@@ -128,15 +123,20 @@
         App.toast("This restaurant isn't accepting takeaway orders right now");
         return;
       }
-      App.setOrderType(type);
-      applyTypeToForm();
-      if (type === "dine-in" && !tableInput.value) {
-        typeBack.style.display = "none";
-        App.toast("Please enter your table number");
-        tableInput.focus();
-        return;
+      if (type === "dine-in") {
+        const t = tableInput.value.trim();
+        if (!t) {
+          typeBack.style.display = "none";
+          document.getElementById("tableField").style.display = "";
+          App.toast("Please enter your table number");
+          tableInput.focus();
+          return;
+        }
+        App.setTableNo(t);
       }
-      if (type === "dine-in") App.setTableNo(tableInput.value);
+      // Takeaway keeps whatever table was scanned but never uses it — the
+      // server forces table to null for takeaway, and checkout hides the field.
+      App.setOrderType(type);
       location.href = "menu.html";
     }));
 

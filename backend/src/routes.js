@@ -13,12 +13,12 @@ const h = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(
 /* ---------- shaping helpers ---------- */
 const MENU_SELECT = `
   SELECT m.id, m.name, m.description, m.price::float AS price, m.veg,
-         m.rating::float AS rating, m.stock, m.image, c.slug AS category
+         m.rating::float AS rating, m.stock, m.image, m.is_combo AS "isCombo", c.slug AS category
   FROM menu_items m LEFT JOIN categories c ON c.id = m.category_id`;
 
 const ORDERS_SELECT = `
   SELECT o.id, o.code, o.table_number AS table, o.customer_name AS customer, o.phone,
-         o.method, o.status, o.total::float AS total, o.created_at AS "createdAt",
+         o.method, o.status, o.total::float AS total, o.discount::float AS discount, o.created_at AS "createdAt",
          o.payment_collected AS "paymentCollected", o.collected_by AS "collectedBy", o.collected_at AS "collectedAt",
          COALESCE(json_agg(json_build_object(
            'id', oi.menu_item_id, 'name', oi.name, 'price', oi.price::float,
@@ -44,11 +44,41 @@ async function getActiveSessionId(client, tenantId) {
   return rows[0] ? rows[0].id : null;
 }
 
+/* How many completed orders this phone number already has with this
+   restaurant. Matched on the last 10 digits so "+91 98765 11111" and
+   "9876511111" count as the same customer, same as /customers does. */
+async function orderCountForPhone(client, tenantId, phone) {
+  const digits = String(phone || "").replace(/\D/g, "").slice(-10);
+  if (digits.length < 6) return 0;
+  const { rows } = await client.query(
+    `SELECT COUNT(*)::int AS n FROM orders
+     WHERE tenant_id=$1 AND right(regexp_replace(phone,'\\D','','g'), 10) = $2`,
+    [tenantId, digits]
+  );
+  return rows[0] ? rows[0].n : 0;
+}
+
+/* Loyalty reward on every Nth order from the same phone number. Always
+   recomputed here on the server — the browser tells us the cart, never the
+   discount, so a customer can't hand themselves a reward they didn't earn. */
+export async function loyaltyDiscount(client, tenant, phone, subtotal) {
+  if (!tenant.loyalty_enabled) return 0;
+  const everyN = Number(tenant.loyalty_every_n) || 0;
+  const percent = Number(tenant.loyalty_percent) || 0;
+  if (everyN < 2 || percent <= 0) return 0;
+  const thisOrderNumber = (await orderCountForPhone(client, tenant.id, phone)) + 1;
+  if (thisOrderNumber % everyN !== 0) return 0;
+  return Math.round(subtotal * percent / 100);
+}
+
 async function createOrder(client, tenantId, body) {
   const items = Array.isArray(body.items) ? body.items : [];
   if (!items.length) throw Object.assign(new Error("Order has no items"), { status: 400 });
   const table = body.table ? Number(body.table) : null;
-  const total = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
+  const subtotal = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
+  const tenant = (await client.query("SELECT * FROM tenants WHERE id=$1", [tenantId])).rows[0];
+  const discount = await loyaltyDiscount(client, tenant, body.phone, subtotal);
+  const total = Math.max(0, subtotal - discount);
   const code = await nextOrderCode(client, tenantId);
   const method = body.method || "Cash";
   // Cash needs someone to physically collect it; every other method (Card/UPI,
@@ -59,9 +89,9 @@ async function createOrder(client, tenantId, body) {
   // year) — this is how each year's orders/payments/analytics stay separate.
   const sessionId = await getActiveSessionId(client, tenantId);
   const order = (await client.query(
-    `INSERT INTO orders (tenant_id, session_id, code, table_number, customer_name, phone, method, status, total, payment_collected)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9) RETURNING id, code`,
-    [tenantId, sessionId, code, table, body.customer || "Guest", body.phone || "", method, total, paymentCollected]
+    `INSERT INTO orders (tenant_id, session_id, code, table_number, customer_name, phone, method, status, total, discount, payment_collected)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10) RETURNING id, code`,
+    [tenantId, sessionId, code, table, body.customer || "Guest", body.phone || "", method, total, discount, paymentCollected]
   )).rows[0];
   for (const it of items) {
     await client.query(
@@ -70,11 +100,19 @@ async function createOrder(client, tenantId, body) {
     );
     // Never let stock go negative — a race between two customers ordering the
     // last few portions at once just clamps at 0 rather than erroring out.
+    // A combo has no stock of its own; it draws down the dishes it bundles.
     if (it.id) {
-      await client.query(
-        `UPDATE menu_items SET stock = GREATEST(0, stock - $1) WHERE id=$2 AND tenant_id=$3`,
-        [Number(it.qty) || 0, it.id, tenantId]
-      );
+      const qty = Number(it.qty) || 0;
+      const parts = (await client.query("SELECT menu_item_id, qty FROM combo_items WHERE combo_id=$1", [it.id])).rows;
+      const toDeduct = parts.length
+        ? parts.map((p) => ({ id: p.menu_item_id, qty: p.qty * qty }))
+        : [{ id: it.id, qty }];
+      for (const d of toDeduct) {
+        await client.query(
+          `UPDATE menu_items SET stock = GREATEST(0, stock - $1) WHERE id=$2 AND tenant_id=$3`,
+          [d.qty, d.id, tenantId]
+        );
+      }
     }
   }
   if (table) await client.query("UPDATE restaurant_tables SET status='occupied' WHERE tenant_id=$1 AND number=$2", [tenantId, table]);
@@ -84,6 +122,8 @@ async function createOrder(client, tenantId, body) {
 const publicTenant = (t) => ({
   slug: t.slug, name: t.name, tagline: t.tagline, phone: t.phone, address: t.address, logo: t.logo,
   currency: t.currency, isClosed: t.is_closed, customDomain: t.custom_domain, primaryColor: t.primary_color,
+  loyaltyEnabled: t.loyalty_enabled, loyaltyEveryN: t.loyalty_every_n, loyaltyPercent: t.loyalty_percent,
+  googleReviewUrl: t.google_review_url || "",
   // Safe to expose: just tells the customer app whether to offer "Pay online".
   // The actual key id (needed to open Razorpay's checkout) is fetched per-order
   // from the /razorpay/order endpoint below, never handed out in bulk here.
@@ -342,6 +382,53 @@ r.get("/customers", auth, requireRole("owner", "manager"), h(async (req, res) =>
   res.json(rows);
 }));
 
+/* ==================== COMBOS ==================== */
+/* A combo is a menu_item with is_combo=true; combo_items says which dishes
+   it bundles. Creating one is a single call so the two always stay in sync. */
+r.get("/combos", auth, h(async (req, res) => {
+  const { rows } = await q(
+    `SELECT m.id, m.name, m.description, m.price::float AS price, m.image, m.veg,
+            COALESCE(json_agg(json_build_object('id', ci.menu_item_id, 'qty', ci.qty))
+              FILTER (WHERE ci.id IS NOT NULL), '[]') AS items
+     FROM menu_items m LEFT JOIN combo_items ci ON ci.combo_id = m.id
+     WHERE m.tenant_id=$1 AND m.is_combo ORDER BY m.name`, [req.user.tid]);
+  res.json(rows);
+}));
+
+r.post("/combos", auth, requireRole("owner", "manager"), h(async (req, res) => {
+  const b = req.body || {};
+  const parts = Array.isArray(b.items) ? b.items.filter((it) => it.id) : [];
+  if (!b.name || !parts.length) return res.status(400).json({ error: "A combo needs a name and at least one dish" });
+  const catId = await categoryIdForSlug(req.user.tid, b.category);
+  const combo = await tx(async (c) => {
+    const row = (await c.query(
+      `INSERT INTO menu_items (tenant_id, category_id, name, description, price, veg, stock, image, is_combo)
+       VALUES ($1,$2,$3,$4,$5,$6,9999,$7,true) RETURNING id`,
+      [req.user.tid, catId, b.name, b.description || "", b.price || 0, b.veg !== false, b.image || ""]
+    )).rows[0];
+    for (const it of parts) {
+      await c.query("INSERT INTO combo_items (combo_id, menu_item_id, qty) VALUES ($1,$2,$3)",
+        [row.id, it.id, Number(it.qty) || 1]);
+    }
+    return row;
+  });
+  res.status(201).json(combo);
+}));
+
+r.delete("/combos/:id", auth, requireRole("owner", "manager"), h(async (req, res) => {
+  await q("DELETE FROM menu_items WHERE id=$1 AND tenant_id=$2 AND is_combo", [req.params.id, req.user.tid]);
+  res.json({ ok: true });
+}));
+
+/* ==================== FEEDBACK ==================== */
+r.get("/feedback", auth, requireRole("owner", "manager"), h(async (req, res) => {
+  const { rows } = await q(
+    `SELECT id, order_code AS "orderCode", rating, comment, customer_name AS customer, phone,
+            created_at AS "createdAt"
+     FROM feedback WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 200`, [req.user.tid]);
+  res.json(rows);
+}));
+
 /* ==================== UPLOADS ==================== */
 /* Images (logo, etc.) go to Cloudflare R2 instead of sitting inline as
    base64 in Postgres — see backend/src/r2.js. Falls back with a clear
@@ -372,6 +459,10 @@ r.put("/settings", auth, requireRole("owner", "manager"), h(async (req, res) => 
   const set = (col, val) => { if (val !== undefined) { fields.push(`${col}=$${fields.length + 1}`); vals.push(val); } };
   set("name", b.name); set("tagline", b.tagline); set("phone", b.phone); set("logo", b.logo); set("address", b.address);
   set("is_closed", b.isClosed);
+  set("loyalty_enabled", b.loyaltyEnabled);
+  if (b.loyaltyEveryN !== undefined) set("loyalty_every_n", Math.max(2, Number(b.loyaltyEveryN) || 5));
+  if (b.loyaltyPercent !== undefined) set("loyalty_percent", Math.min(100, Math.max(1, Number(b.loyaltyPercent) || 10)));
+  if (b.googleReviewUrl !== undefined) set("google_review_url", String(b.googleReviewUrl).trim() || null);
   // Domain, brand colour and payment keys are sensitive/structural — owner only.
   if (req.user.role === "owner") {
     set("primary_color", b.primaryColor);
@@ -453,6 +544,41 @@ r.get("/public/:slug/orders/:code", h(loadTenant), h(async (req, res) => {
   res.json(rows[0]);
 }));
 
+/* Tells the checkout page whether this customer's next order earns a loyalty
+   reward, so it can show the discount before they pay. Advisory only — the
+   real discount is recomputed server-side when the order is created. */
+r.get("/public/:slug/loyalty", h(loadTenant), h(async (req, res) => {
+  const t = req.tenant;
+  if (!t.loyalty_enabled) return res.json({ enabled: false });
+  const subtotal = Number(req.query.subtotal) || 0;
+  const discount = await loyaltyDiscount({ query: q }, t, req.query.phone, subtotal);
+  const count = await orderCountForPhone({ query: q }, t.id, req.query.phone);
+  res.json({
+    enabled: true, everyN: t.loyalty_every_n, percent: t.loyalty_percent,
+    ordersSoFar: count, discount,
+    ordersUntilReward: (t.loyalty_every_n - ((count + 1) % t.loyalty_every_n)) % t.loyalty_every_n,
+  });
+}));
+
+/* Private feedback — stored for the restaurant's eyes only, never published.
+   Tied to a real order code so it can't be spammed anonymously. */
+r.post("/public/:slug/feedback", h(loadTenant), h(async (req, res) => {
+  const { code, rating, comment } = req.body || {};
+  const stars = Number(rating);
+  if (!(stars >= 1 && stars <= 5)) return res.status(400).json({ error: "Please pick a rating from 1 to 5" });
+  const order = (await q("SELECT id, code, customer_name, phone FROM orders WHERE tenant_id=$1 AND code=$2",
+    [req.tenant.id, code])).rows[0];
+  if (!order) return res.status(404).json({ error: "Order not found" });
+  const already = (await q("SELECT id FROM feedback WHERE tenant_id=$1 AND order_id=$2", [req.tenant.id, order.id])).rows[0];
+  if (already) return res.status(409).json({ error: "You've already rated this order — thank you!" });
+  await q(
+    `INSERT INTO feedback (tenant_id, order_id, order_code, rating, comment, customer_name, phone)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [req.tenant.id, order.id, order.code, stars, (comment || "").trim().slice(0, 1000), order.customer_name, order.phone]
+  );
+  res.status(201).json({ ok: true, googleReviewUrl: req.tenant.google_review_url || "" });
+}));
+
 /* Razorpay, step 1: create a payment-gateway order sized to the cart total,
    using the restaurant's own keys (every tenant bills through its own
    Razorpay account — we never touch the money). No internal order exists
@@ -462,8 +588,11 @@ r.post("/public/:slug/razorpay/order", h(loadTenant), h(async (req, res) => {
   if (!keyId || !keySecret) return res.status(400).json({ error: "Online payments aren't set up for this restaurant yet" });
   const items = Array.isArray(req.body?.items) ? req.body.items : [];
   if (!items.length) return res.status(400).json({ error: "Your cart is empty" });
-  const total = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
-  const amountPaise = Math.round(total * 100);
+  const subtotal = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
+  // Charge exactly what createOrder will record as the order total, or the
+  // customer would be billed full price for an order stored as discounted.
+  const discount = await loyaltyDiscount({ query: q }, req.tenant, req.body?.phone, subtotal);
+  const amountPaise = Math.round(Math.max(0, subtotal - discount) * 100);
   if (amountPaise < 100) return res.status(400).json({ error: "Order amount is too small to pay online" });
 
   const resp = await fetch("https://api.razorpay.com/v1/orders", {

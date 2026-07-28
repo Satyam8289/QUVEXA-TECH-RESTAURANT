@@ -34,6 +34,8 @@
         <div class="pay-methods" id="payMethods"></div>
       </div>
 
+      <div class="section" style="padding-top:10px;padding-bottom:0" id="loyaltyNote"></div>
+
       <div class="section" style="padding-top:10px">
         <div class="card summary" id="summary"></div>
       </div>
@@ -91,7 +93,34 @@
     const sub = () => Cart.subtotal();
     const gst = () => Math.round(sub() * 0.05);
     const service = () => Math.round(sub() * 0.03);
-    const total = () => sub() + gst() + service();
+    let loyaltyDiscount = 0;   // filled in by refreshLoyalty() once we know the phone
+    const total = () => Math.max(0, sub() + gst() + service() - loyaltyDiscount);
+
+    /* Loyalty reward preview. The server decides whether this order actually
+       earns one (and recomputes it at order time) — we only display it. */
+    async function refreshLoyalty() {
+      const phone = document.getElementById("phone").value.trim();
+      let info = null;
+      try { info = await Api.loyaltyStatus(phone, sub()); } catch (e) { /* non-critical */ }
+      loyaltyDiscount = (info && info.discount) || 0;
+      const note = document.getElementById("loyaltyNote");
+      if (info && info.enabled && !loyaltyDiscount && info.ordersUntilReward > 0 && phone) {
+        note.innerHTML = `<div class="card" style="padding:12px 14px;font-size:13px;display:flex;align-items:center;gap:9px">
+          ${App.icon("star", 16)}<span><b>${info.ordersUntilReward}</b> more order${info.ordersUntilReward === 1 ? "" : "s"} and you unlock <b>${info.percent}% off</b>.</span></div>`;
+      } else note.innerHTML = "";
+      renderSummary();
+    }
+
+    function renderSummary() {
+      document.getElementById("summary").innerHTML = `
+        <div class="row"><span>Subtotal</span><span>${App.money(sub())}</span></div>
+        <div class="row"><span>GST (5%)</span><span>${App.money(gst())}</span></div>
+        <div class="row"><span>Service charge</span><span>${App.money(service())}</span></div>
+        ${loyaltyDiscount ? `<div class="row" style="color:var(--green-700);font-weight:600"><span>${App.icon("star",14)} Loyalty reward</span><span>− ${App.money(loyaltyDiscount)}</span></div>` : ""}
+        <div class="row total"><span>Total payable</span><span>${App.money(total())}</span></div>`;
+      const btn = document.querySelector("#dock button");
+      if (btn && !btn.disabled) btn.textContent = `Place Order · ${App.money(total())}`;
+    }
 
     let tenantName = "";
     async function main() {
@@ -108,13 +137,13 @@
         document.getElementById("dock").innerHTML = "";
         return;
       }
-      document.getElementById("summary").innerHTML = `
-        <div class="row"><span>Subtotal</span><span>${App.money(sub())}</span></div>
-        <div class="row"><span>GST (5%)</span><span>${App.money(gst())}</span></div>
-        <div class="row"><span>Service charge</span><span>${App.money(service())}</span></div>
-        <div class="row total"><span>Total payable</span><span>${App.money(total())}</span></div>`;
       document.getElementById("dock").innerHTML =
         `<button class="btn btn-block btn-lg" type="submit" form="checkoutForm">Place Order · ${App.money(total())}</button>`;
+      renderSummary();
+      refreshLoyalty();
+      // Re-check whenever they finish editing the phone — that's the key the
+      // loyalty count is tracked against.
+      document.getElementById("phone").addEventListener("change", refreshLoyalty);
     }
     main();
 
@@ -135,7 +164,7 @@
         submitBtn.disabled = true; submitBtn.textContent = "Starting payment…";
         try {
           await loadRazorpayScript();
-          const rzp = await Api.razorpayCreateOrder(items);
+          const rzp = await Api.razorpayCreateOrder(items, phone);
           const checkout = new Razorpay({
             key: rzp.keyId,
             order_id: rzp.razorpayOrderId,

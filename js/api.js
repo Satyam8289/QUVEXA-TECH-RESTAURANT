@@ -102,9 +102,23 @@ const Api = (() => {
   const getOrderByCode = (code) => req(`/public/${tenantSlug()}/orders/${encodeURIComponent(code)}`);
   const myOrders = (phone) => req(`/public/${tenantSlug()}/orders?phone=${encodeURIComponent(phone)}`);
 
+  /* Loyalty preview + private feedback (customer side). */
+  const loyaltyStatus = (phone, subtotal) =>
+    req(`/public/${tenantSlug()}/loyalty?phone=${encodeURIComponent(phone || "")}&subtotal=${subtotal || 0}`);
+  const submitFeedback = (code, rating, comment) =>
+    req(`/public/${tenantSlug()}/feedback`, { method: "POST", body: { code, rating, comment } });
+
+  /* Combos (staff side). */
+  const getCombos = () => authReq("/combos");
+  const saveCombo = (combo) => authReq("/combos", { method: "POST", body: combo });
+  const deleteCombo = (id) => authReq(`/combos/${id}`, { method: "DELETE" });
+  const getFeedback = () => authReq("/feedback");
+
   /* Razorpay online checkout: create a gateway order sized to the cart,
      then (after the customer pays) verify + create the real order in one step. */
-  const razorpayCreateOrder = (items) => req(`/public/${tenantSlug()}/razorpay/order`, { method: "POST", body: { items } });
+  // phone is sent so the server can apply the same loyalty discount it will
+  // record on the order — otherwise we'd charge full price for a discounted order.
+  const razorpayCreateOrder = (items, phone) => req(`/public/${tenantSlug()}/razorpay/order`, { method: "POST", body: { items, phone } });
   const razorpayVerifyAndPlaceOrder = (payload) => req(`/public/${tenantSlug()}/razorpay/verify`, { method: "POST", body: payload });
 
   /* Branding lookup while typing a username on the staff login page. */
@@ -189,6 +203,7 @@ const Api = (() => {
     BASE, tenantSlug, setTenantSlug, cache: () => cache,
     loadPublic, getMenuPublic, getCategoriesPublic, placeOrderPublic, getOrderByCode, myOrders, lookupBranding,
     razorpayCreateOrder, razorpayVerifyAndPlaceOrder, uploadImage,
+    loyaltyStatus, submitFeedback, getCombos, saveCombo, deleteCombo, getFeedback,
     resolveDomain, ensureTenantResolved,
     login, logout, isAuthed, currentUser, me, requireAuth, authReq,
     getMenu, saveMenuItem, deleteMenuItem, getCategories, getTables, addTable,

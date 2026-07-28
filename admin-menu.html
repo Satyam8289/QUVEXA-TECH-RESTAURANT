@@ -62,11 +62,32 @@
     </form>
   </div>
 
+  <!-- Combo modal: pick existing dishes, set a bundle price -->
+  <div class="modal-back" id="comboBack">
+    <form class="modal card" id="comboForm" style="max-width:560px">
+      <h3>Add a combo</h3>
+      <p class="settings-hint" style="margin:-6px 0 16px">Bundle dishes at a set price. Ordering a combo deducts stock from each dish inside it.</p>
+      <div class="form-grid">
+        <div class="field full"><label>Combo name</label><input class="input" id="c-name" required placeholder="e.g. Veg Thali Combo" /></div>
+        <div class="field"><label>Combo price (₹)</label><input class="input" id="c-price" type="number" min="0" required /></div>
+        <div class="field"><label>Category</label><select class="input" id="c-cat"></select></div>
+        <div class="field full"><label>Photo URL (optional)</label><input class="input" id="c-image" placeholder="https://…" /></div>
+      </div>
+      <label style="font-size:13px;font-weight:600;color:var(--muted);display:block;margin:6px 0 8px">Dishes in this combo</label>
+      <div id="comboPicker" style="max-height:230px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;padding:6px"></div>
+      <div id="comboSummary" class="settings-hint" style="margin-top:10px"></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="comboCancel" style="flex:1">Cancel</button>
+        <button type="submit" class="btn" style="flex:1">Save combo</button>
+      </div>
+    </form>
+  </div>
+
   <script src="js/api.js"></script>
   <script src="js/cart.js"></script>
   <script src="js/app.js"></script>
   <script>
-    let CATS = [], MENU = [];
+    let CATS = [], MENU = [], COMBOS = [];
     const catName = (slug) => (CATS.find((c) => c.slug === slug) || {}).name || slug;
 
     let vegChoice = true;
@@ -78,15 +99,53 @@
       }));
 
     function renderGrid() {
-      const nCats = new Set(MENU.map((m) => m.category)).size;
+      const dishes = MENU.filter((m) => !m.isCombo);
+      const nCats = new Set(dishes.map((m) => m.category)).size;
       document.getElementById("view").innerHTML = `
         <div class="view-head">
-          <p>${MENU.length} items across ${nCats} categories</p>
-          <div class="actions"><button class="btn" id="addBtn">+ Add menu item</button></div>
+          <p>${dishes.length} items across ${nCats} categories · ${COMBOS.length} combo${COMBOS.length === 1 ? "" : "s"}</p>
+          <div class="actions">
+            <button class="btn btn-ghost" id="addComboBtn">+ Add combo</button>
+            <button class="btn" id="addBtn">+ Add menu item</button>
+          </div>
         </div>
-        <div class="menu-grid">${MENU.map(cardHTML).join("")}</div>`;
+        ${COMBOS.length ? `<div class="panel card" style="margin-bottom:20px">
+          <div class="panel-head"><h3>Combos &amp; bundles</h3><span class="link">Shown to customers with a COMBO badge</span></div>
+          <div class="menu-grid">${COMBOS.map(comboCardHTML).join("")}</div>
+        </div>` : ""}
+        <div class="menu-grid">${dishes.map(cardHTML).join("")}</div>`;
       document.getElementById("addBtn").addEventListener("click", () => openModal(null));
+      document.getElementById("addComboBtn").addEventListener("click", openComboModal);
       bind();
+    }
+
+    /* A combo bundles existing dishes at a set price. Its own card shows what
+       it contains and what the customer saves versus ordering separately. */
+    function comboCardHTML(c) {
+      const parts = c.items.map((p) => {
+        const dish = MENU.find((m) => m.id === p.id);
+        return dish ? `${p.qty}× ${dish.name}` : null;
+      }).filter(Boolean);
+      const apart = c.items.reduce((s, p) => {
+        const dish = MENU.find((m) => m.id === p.id);
+        return s + (dish ? dish.price * p.qty : 0);
+      }, 0);
+      const saves = Math.max(0, apart - c.price);
+      return `<div class="card menu-card">
+        <img class="mc-img" src="${c.image}" alt="${c.name}" onerror="App.imgFallback(this)" />
+        <div class="mc-body">
+          <div class="mc-meta">
+            <span class="mc-cat">Combo</span>
+            ${saves ? `<span class="mc-stock">Saves ${App.money(saves)}</span>` : ""}
+          </div>
+          <h4>${c.name}</h4>
+          <p>${parts.join(" + ") || "No dishes linked"}</p>
+          <div class="mc-foot">
+            <b>${App.money(c.price)}</b>
+            <a class="mc-edit" href="#" data-delcombo="${c.id}" style="color:var(--danger)">${App.icon("minus",14)} Delete</a>
+          </div>
+        </div>
+      </div>`;
     }
 
     function cardHTML(m) {
@@ -112,6 +171,15 @@
     }
 
     function bind() {
+      document.querySelectorAll("[data-delcombo]").forEach((b) => b.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const c = COMBOS.find((x) => x.id === b.dataset.delcombo);
+        if (!confirm(`Delete the "${c.name}" combo?`)) return;
+        await Api.deleteCombo(c.id);
+        COMBOS = COMBOS.filter((x) => x.id !== c.id);
+        MENU = MENU.filter((m) => m.id !== c.id);
+        App.toast("Combo deleted"); renderGrid();
+      }));
       document.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); openModal(b.dataset.edit); }));
       document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async (e) => {
         e.preventDefault();
@@ -169,6 +237,78 @@
     document.getElementById("cancelBtn").addEventListener("click", closeModal);
     modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
 
+    /* ---------- Combos ---------- */
+    const comboBack = document.getElementById("comboBack");
+    const comboQty = {};   // menu item id -> qty chosen for the combo being built
+
+    function renderComboPicker() {
+      const dishes = MENU.filter((m) => !m.isCombo);
+      document.getElementById("comboPicker").innerHTML = dishes.map((m) => `
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:9px;cursor:pointer">
+          <input type="checkbox" data-cpick="${m.id}" ${comboQty[m.id] ? "checked" : ""} style="width:16px;height:16px">
+          <span style="flex:1;font-size:13.5px">${m.name}<small style="color:var(--muted)"> · ${App.money(m.price)}</small></span>
+          <input type="number" min="1" value="${comboQty[m.id] || 1}" data-cqty="${m.id}"
+                 style="width:58px;padding:5px 7px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px">
+        </label>`).join("") || `<p class="settings-hint" style="padding:10px">Add some dishes first, then bundle them into a combo.</p>`;
+
+      document.querySelectorAll("[data-cpick]").forEach((cb) => cb.addEventListener("change", () => {
+        const id = cb.dataset.cpick;
+        if (cb.checked) comboQty[id] = Number(document.querySelector(`[data-cqty="${id}"]`).value) || 1;
+        else delete comboQty[id];
+        updateComboSummary();
+      }));
+      document.querySelectorAll("[data-cqty]").forEach((inp) => inp.addEventListener("input", () => {
+        const id = inp.dataset.cqty;
+        if (comboQty[id]) { comboQty[id] = Number(inp.value) || 1; updateComboSummary(); }
+      }));
+      updateComboSummary();
+    }
+
+    function updateComboSummary() {
+      const apart = Object.entries(comboQty).reduce((s, [id, qty]) => {
+        const m = MENU.find((x) => x.id === id);
+        return s + (m ? m.price * qty : 0);
+      }, 0);
+      const price = Number(document.getElementById("c-price").value) || 0;
+      const el = document.getElementById("comboSummary");
+      if (!apart) { el.textContent = "Pick at least one dish."; return; }
+      const saves = apart - price;
+      el.innerHTML = `Bought separately: <b>${App.money(apart)}</b>` +
+        (price ? ` · Customer ${saves >= 0 ? "saves" : "pays extra"} <b style="color:${saves >= 0 ? "var(--green-700)" : "var(--danger)"}">${App.money(Math.abs(saves))}</b>` : "");
+    }
+
+    function openComboModal() {
+      Object.keys(comboQty).forEach((k) => delete comboQty[k]);
+      document.getElementById("c-name").value = "";
+      document.getElementById("c-price").value = "";
+      document.getElementById("c-image").value = "";
+      document.getElementById("c-cat").innerHTML = CATS.map((c) => `<option value="${c.slug}">${c.name}</option>`).join("");
+      renderComboPicker();
+      comboBack.classList.add("open");
+    }
+    document.getElementById("comboCancel").addEventListener("click", () => comboBack.classList.remove("open"));
+    comboBack.addEventListener("click", (e) => { if (e.target === comboBack) comboBack.classList.remove("open"); });
+    document.getElementById("c-price").addEventListener("input", updateComboSummary);
+
+    document.getElementById("comboForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const items = Object.entries(comboQty).map(([id, qty]) => ({ id, qty }));
+      if (!items.length) { App.toast("Pick at least one dish for the combo"); return; }
+      try {
+        await Api.saveCombo({
+          name: document.getElementById("c-name").value.trim(),
+          price: Number(document.getElementById("c-price").value),
+          category: document.getElementById("c-cat").value,
+          image: document.getElementById("c-image").value.trim() || PLACEHOLDER,
+          items,
+        });
+        [MENU, COMBOS] = await Promise.all([Api.getMenu(), Api.getCombos()]);
+        App.toast("Combo added");
+        comboBack.classList.remove("open");
+        renderGrid();
+      } catch (ex) { App.toast(ex.message); }
+    });
+
     const PLACEHOLDER = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=70";
     document.getElementById("itemForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -216,8 +356,8 @@
       if (!authData) return;
       App.mountSidebar("sidebar", "menu");
       App.mountMobileNav("mobileNav", "menu");
-      App.mountTopbar("topbar", "Menu", async () => { [CATS, MENU] = await Promise.all([Api.getCategories(), Api.getMenu()]); renderGrid(); App.toast("Refreshed"); });
-      [CATS, MENU] = await Promise.all([Api.getCategories(), Api.getMenu()]);
+      App.mountTopbar("topbar", "Menu", async () => { [CATS, MENU, COMBOS] = await Promise.all([Api.getCategories(), Api.getMenu(), Api.getCombos()]); renderGrid(); App.toast("Refreshed"); });
+      [CATS, MENU, COMBOS] = await Promise.all([Api.getCategories(), Api.getMenu(), Api.getCombos()]);
       document.getElementById("f-cat").innerHTML = CATS.map((c) => `<option value="${c.slug}">${c.name}</option>`).join("");
       renderGrid();
     }

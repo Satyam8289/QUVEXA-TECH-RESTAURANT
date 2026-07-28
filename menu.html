@@ -108,6 +108,7 @@
           <div class="dish-top">
             <span class="veg-dot ${m.veg ? "veg" : "nonveg"}"></span>
             <span class="dish-name">${m.name}</span>
+            ${m.isCombo ? `<span class="combo-tag">COMBO</span>` : ""}
             <span class="dish-rating">${App.icon("star",13)} ${m.rating}</span>
           </div>
           <p class="dish-desc">${m.description}</p>

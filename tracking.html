@@ -25,6 +25,7 @@
     ];
     const ORDER_OF = { pending: 0, preparing: 1, ready: 2, served: 3 };
     const code = new URLSearchParams(location.search).get("id") || localStorage.getItem("foodhouse-lastOrder");
+    let lastStatus = null;
 
     async function render() {
       const content = document.getElementById("content");
@@ -38,6 +39,10 @@
         content.innerHTML = `<div class="empty">${App.icon("clock",44)}<h3>Order not found</h3><p>${e.message}</p><a class="btn" style="margin-top:16px" href="menu.html">Browse Menu</a></div>`;
         return;
       }
+      // The 4s poll only needs to redraw when something actually changed —
+      // otherwise it would wipe out a half-typed feedback comment.
+      if (order.status === lastStatus) return;
+      lastStatus = order.status;
       const cur = ORDER_OF[order.status];
 
       content.innerHTML = `
@@ -72,12 +77,68 @@
           </div>
         </div>
 
+        <div class="section" id="feedbackSlot" style="padding-top:0"></div>
+
         <div class="section" style="padding-top:0">
           <div style="display:flex;gap:10px">
             <a class="btn btn-ghost btn-block" href="bill.html?code=${encodeURIComponent(order.code)}&r=${Api.tenantSlug()}">${App.icon("clipboard",16)} Bill</a>
             <a class="btn btn-wa btn-block" target="_blank" rel="noopener" href="${App.whatsappOrderLink(order)}">${App.icon("whatsapp",18)} WhatsApp</a>
           </div>
           <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:12px">Status updates automatically as the kitchen progresses. You can also collect it from reception.</p>
+        </div>`;
+
+      if (order.status === "served") renderFeedback(order);
+    }
+
+    /* Private rating — goes only to the restaurant. Once it's in, happy
+       customers get the option to also post publicly on Google; we can never
+       post on their behalf (Google forbids it), they tap through themselves. */
+    const ratedKey = (code) => `foodhouse-rated:${code}`;
+    let chosenRating = 0;
+
+    function renderFeedback(order) {
+      const slot = document.getElementById("feedbackSlot");
+      if (!slot) return;
+      if (localStorage.getItem(ratedKey(order.code))) { renderThanks(slot); return; }
+      slot.innerHTML = `
+        <div class="card" style="padding:18px">
+          <b style="font-size:15px">How was your meal?</b>
+          <p style="color:var(--muted);font-size:12.5px;margin:4px 0 14px">This goes straight to the restaurant — it isn't posted anywhere public.</p>
+          <div id="stars" style="display:flex;gap:8px;margin-bottom:14px">
+            ${[1,2,3,4,5].map(n => `<button type="button" class="star-btn" data-star="${n}" aria-label="${n} star">${App.icon("star",26)}</button>`).join("")}
+          </div>
+          <textarea class="input" id="fbComment" rows="2" placeholder="Anything we could do better? (optional)" style="resize:vertical"></textarea>
+          <button class="btn btn-block" id="fbSend" style="margin-top:12px">Send feedback</button>
+          <div id="fbMsg"></div>
+        </div>`;
+      slot.querySelectorAll("[data-star]").forEach((b) => b.addEventListener("click", () => {
+        chosenRating = Number(b.dataset.star);
+        slot.querySelectorAll("[data-star]").forEach((x) =>
+          x.classList.toggle("on", Number(x.dataset.star) <= chosenRating));
+      }));
+      document.getElementById("fbSend").addEventListener("click", async () => {
+        if (!chosenRating) { App.toast("Please pick a star rating"); return; }
+        const btn = document.getElementById("fbSend");
+        btn.disabled = true; btn.textContent = "Sending…";
+        try {
+          const res = await Api.submitFeedback(order.code, chosenRating, document.getElementById("fbComment").value);
+          localStorage.setItem(ratedKey(order.code), String(chosenRating));
+          renderThanks(slot, chosenRating, res.googleReviewUrl);
+        } catch (e) {
+          document.getElementById("fbMsg").innerHTML = `<p style="color:var(--danger);font-size:12.5px;margin-top:8px">${e.message}</p>`;
+          btn.disabled = false; btn.textContent = "Send feedback";
+        }
+      });
+    }
+
+    function renderThanks(slot, rating, googleUrl) {
+      const stars = rating || Number(localStorage.getItem(ratedKey(code))) || 0;
+      slot.innerHTML = `
+        <div class="card" style="padding:18px;text-align:center">
+          <div style="color:var(--green-700)">${App.icon("check",30)}</div>
+          <b style="font-size:15px;display:block;margin-top:4px">Thanks for the feedback!</b>
+          <p style="color:var(--muted);font-size:12.5px;margin-top:4px">The restaurant has been notified.</p>
+          ${stars >= 4 && googleUrl ? `<a class="btn btn-ghost btn-block" style="margin-top:14px" target="_blank" rel="noopener" href="${googleUrl}">${App.icon("star",16)} Share it on Google too</a>` : ""}
         </div>`;
     }
 

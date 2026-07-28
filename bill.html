@@ -88,6 +88,7 @@
               </tbody>
             </table>
             <div class="bill-totals">
+              ${order.discount ? `<div class="row"><span>Loyalty reward</span><span>− ${App.money(order.discount)}</span></div>` : ""}
               <div class="row grand"><span>Total paid</span><span>${App.money(order.total)}</span></div>
             </div>
             <div class="bill-foot">Thank you for dining with us!<br>Order status: <b style="color:var(--ink);text-transform:capitalize">${order.status}</b></div>

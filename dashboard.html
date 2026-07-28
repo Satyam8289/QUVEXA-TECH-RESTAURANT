@@ -556,6 +556,45 @@
       bindChartFilters();
     }
 
+    /* Private customer feedback — never published anywhere, so a bad meal
+       reaches the owner before it turns into a public one-star review. */
+    let feedbackFilter = "all";
+    async function renderFeedback() {
+      view.innerHTML = `<div class="skeleton"><span class="spin"></span> Loading feedback…</div>`;
+      let all = [];
+      try { all = await Api.getFeedback(); } catch (e) { all = []; }
+
+      const avg = all.length ? (all.reduce((s, f) => s + f.rating, 0) / all.length) : 0;
+      const unhappy = all.filter((f) => f.rating <= 3).length;
+      const list = feedbackFilter === "low" ? all.filter((f) => f.rating <= 3) : all;
+      const starsFor = (n) => [1,2,3,4,5].map((i) =>
+        `<span style="color:${i <= n ? "var(--amber)" : "var(--line)"}">${App.icon("star",14)}</span>`).join("");
+
+      view.innerHTML = viewHead(`${all.length} review${all.length === 1 ? "" : "s"} from your customers · private to you`, "")
+        + `<div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+            <div class="kpi card kpi-hero"><div class="kpi-ic">${App.icon("star", 20)}</div><div class="lbl">Average rating</div><div class="val">${avg ? avg.toFixed(1) : "—"}</div></div>
+            <div class="kpi card"><div class="kpi-ic">${App.icon("message", 20)}</div><div class="lbl">Total reviews</div><div class="val">${all.length}</div></div>
+            <div class="kpi card amber"><div class="kpi-ic">${App.icon("alert", 20)}</div><div class="lbl">Needs attention</div><div class="val">${unhappy}</div></div>
+          </div>
+          <div class="filters" style="padding:0 0 16px">
+            <button class="pill ${feedbackFilter === "all" ? "active" : ""}" data-fb="all">All</button>
+            <button class="pill ${feedbackFilter === "low" ? "active" : ""}" data-fb="low">3★ and below</button>
+          </div>
+          <div class="panel card"><div class="table-scroll">
+            <table class="otable otable-responsive"><thead><tr><th>Rating</th><th>Comment</th><th>Customer</th><th>Order</th><th>Date</th></tr></thead><tbody>`
+          + list.map((f) => `<tr>
+              <td data-label="Rating" style="white-space:nowrap">${starsFor(f.rating)}</td>
+              <td data-label="Comment" style="max-width:340px">${f.comment ? f.comment : `<span style="color:var(--muted)">—</span>`}</td>
+              <td data-label="Customer"><b style="font-size:13px">${f.customer || "Guest"}</b>${f.phone ? `<br><small style="color:var(--muted)">${f.phone}</small>` : ""}</td>
+              <td data-label="Order" class="oid">${f.orderCode || "—"}</td>
+              <td data-label="Date" style="color:var(--muted);font-size:12.5px;white-space:nowrap">${formatDateTime(f.createdAt)}</td>
+            </tr>`).join("")
+          + (list.length ? "" : `<tr><td colspan="5" style="color:var(--muted);padding:22px;text-align:center">No feedback yet — it appears here as customers rate their orders.</td></tr>`)
+          + `</tbody></table></div></div>`;
+      view.querySelectorAll("[data-fb]").forEach((b) =>
+        b.addEventListener("click", () => { feedbackFilter = b.dataset.fb; renderFeedback(); }));
+    }
+
     async function renderSettings() {
       view.innerHTML = `<div class="skeleton"><span class="spin"></span> Loading settings…</div>`;
       const s = await Api.getSettings();
@@ -603,6 +642,22 @@
                   <div class="field"><label>Key ID</label><input class="input" id="setRzpKeyId" placeholder="rzp_live_xxxxxxxxxxxx" value="${s.razorpayKeyId || ""}"></div>
                   <div class="field" style="margin-bottom:0"><label>Key Secret</label><input class="input" type="password" id="setRzpKeySecret" placeholder="${s.razorpayConnected ? "•••••••••••• (unchanged — type to replace)" : "Enter key secret"}"></div>
                 ` : `<p style="font-size:13px;color:var(--muted)">${s.razorpayConnected ? "Razorpay is connected." : "Not connected yet — ask the owner to add API keys."} (owner only)</p>`}
+              </div>
+              <div class="panel card">
+                <div class="panel-head"><h3>Loyalty rewards</h3>${s.loyaltyEnabled ? `<span class="badge ready">On</span>` : ""}</div>
+                <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+                  <label class="switch"><input type="checkbox" id="loyaltyToggle" ${s.loyaltyEnabled ? "checked" : ""}><span class="slider"></span></label>
+                  <p class="settings-hint" style="margin:0">Automatically reward regulars — the discount applies itself at checkout, tracked by phone number.</p>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                  <div class="field" style="margin-bottom:0"><label>Every Nth order</label><input class="input" id="loyaltyEveryN" type="number" min="2" value="${s.loyaltyEveryN || 5}"></div>
+                  <div class="field" style="margin-bottom:0"><label>Discount %</label><input class="input" id="loyaltyPercent" type="number" min="1" max="100" value="${s.loyaltyPercent || 10}"></div>
+                </div>
+              </div>
+              <div class="panel card">
+                <div class="panel-head"><h3>Google review link</h3></div>
+                <p class="settings-hint" style="margin:0 0 12px">After a customer rates you <b>4★ or higher</b> privately, they're offered this link to post publicly. Reviews can only ever be written by the customer themselves — no system can post on their behalf.</p>
+                <div class="field" style="margin-bottom:0"><input class="input" id="setGoogleReview" placeholder="https://g.page/r/…/review" value="${s.googleReviewUrl || ""}"></div>
               </div>
               <div class="panel card">
                 <div class="panel-head"><h3>Close store</h3></div>
@@ -658,6 +713,10 @@
           tagline: document.getElementById("setTagline").value.trim(),
           phone: document.getElementById("setPhone").value.trim(),
           isClosed: document.getElementById("closeStoreToggle").checked,
+          loyaltyEnabled: document.getElementById("loyaltyToggle").checked,
+          loyaltyEveryN: Number(document.getElementById("loyaltyEveryN").value),
+          loyaltyPercent: Number(document.getElementById("loyaltyPercent").value),
+          googleReviewUrl: document.getElementById("setGoogleReview").value.trim(),
         };
         const domainInput = document.getElementById("setDomain");
         if (domainInput) patch.customDomain = domainInput.value.trim();
@@ -693,8 +752,8 @@
     }
 
     /* ---------- router ---------- */
-    const TITLES = { overview: "Overview", orders: "Live orders", payments: "Payments", stock: "Stock", staff: "Staff", analytics: "Analytics", settings: "Settings" };
-    const VIEWS = { overview: renderOverview, orders: renderOrders, payments: renderPayments, stock: renderStock, staff: renderStaff, analytics: renderAnalytics, settings: renderSettings };
+    const TITLES = { overview: "Overview", orders: "Live orders", payments: "Payments", stock: "Stock", staff: "Staff", analytics: "Analytics", feedback: "Feedback", settings: "Settings" };
+    const VIEWS = { overview: renderOverview, orders: renderOrders, payments: renderPayments, stock: renderStock, staff: renderStaff, analytics: renderAnalytics, feedback: renderFeedback, settings: renderSettings };
     const currentView = () => { const h = location.hash.replace("#", ""); return VIEWS[h] ? h : "overview"; };
     async function route() {
       let v = currentView();

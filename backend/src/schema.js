@@ -21,6 +21,13 @@ ALTER TABLE tenants ADD COLUMN IF NOT EXISTS custom_domain TEXT;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS primary_color TEXT;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS razorpay_key_id TEXT;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS razorpay_key_secret TEXT;
+-- Loyalty: every Nth order from the same phone number earns a % discount.
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS loyalty_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS loyalty_every_n INT NOT NULL DEFAULT 5;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS loyalty_percent INT NOT NULL DEFAULT 10;
+-- Where to send happy customers to leave a public review (we can never post
+-- on their behalf — Google forbids it — so this is just a link they tap).
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS google_review_url TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_custom_domain ON tenants(custom_domain) WHERE custom_domain IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -59,6 +66,18 @@ CREATE TABLE IF NOT EXISTS menu_items (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_menu_tenant ON menu_items(tenant_id);
+
+-- A combo is just a menu_item flagged as one, so it gets a name, price,
+-- photo, category and menu placement for free — combo_items then lists the
+-- dishes it bundles, which is what actually gets deducted from stock.
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_combo BOOLEAN NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS combo_items (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  combo_id      UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  menu_item_id  UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  qty           INT NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_combo_items_combo ON combo_items(combo_id);
 
 CREATE TABLE IF NOT EXISTS restaurant_tables (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -111,6 +130,23 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS session_id UUID REFERENCES sessions(
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_order_id TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_payment_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_orders_session ON orders(session_id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount NUMERIC(10,2) NOT NULL DEFAULT 0;
+
+-- Private feedback: only the restaurant ever sees this. Asking here rather
+-- than on a public review site is the point — the owner hears about a bad
+-- meal before it turns into a one-star review.
+CREATE TABLE IF NOT EXISTS feedback (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id      UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  order_id       UUID REFERENCES orders(id) ON DELETE SET NULL,
+  order_code     TEXT,
+  rating         INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment        TEXT,
+  customer_name  TEXT,
+  phone          TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_tenant ON feedback(tenant_id, created_at DESC);
 -- Cash orders start uncollected; everything else (UPI/Card, chosen at the
 -- counter) is settled instantly. Razorpay is the one online method that
 -- stays uncollected until its payment is actually verified.

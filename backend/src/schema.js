@@ -131,6 +131,10 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_order_id TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_payment_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_orders_session ON orders(session_id);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount NUMERIC(10,2) NOT NULL DEFAULT 0;
+-- Tax and service charge are stored per order (not just recomputed) so a
+-- past bill still shows what was actually charged if the rates ever change.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax NUMERIC(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_charge NUMERIC(10,2) NOT NULL DEFAULT 0;
 
 -- Private feedback: only the restaurant ever sees this. Asking here rather
 -- than on a public review site is the point — the owner hears about a bad

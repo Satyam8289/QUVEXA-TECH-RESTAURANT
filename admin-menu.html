@@ -357,7 +357,16 @@
       App.mountSidebar("sidebar", "menu");
       App.mountMobileNav("mobileNav", "menu");
       App.mountTopbar("topbar", "Menu", async () => { [CATS, MENU, COMBOS] = await Promise.all([Api.getCategories(), Api.getMenu(), Api.getCombos()]); renderGrid(); App.toast("Refreshed"); });
-      [CATS, MENU, COMBOS] = await Promise.all([Api.getCategories(), Api.getMenu(), Api.getCombos()]);
+      try {
+        [CATS, MENU, COMBOS] = await Promise.all([Api.getCategories(), Api.getMenu(), Api.getCombos()]);
+      } catch (e) {
+        // Without this the page sits on "Loading…" forever whenever any one
+        // of these calls fails, with no clue as to why.
+        document.getElementById("view").innerHTML =
+          `<div class="empty">${App.icon("alert",40)}<h3>Couldn't load the menu</h3><p>${e.message}</p>
+           <button class="btn" style="margin-top:16px" onclick="location.reload()">Try again</button></div>`;
+        return;
+      }
       document.getElementById("f-cat").innerHTML = CATS.map((c) => `<option value="${c.slug}">${c.name}</option>`).join("");
       renderGrid();
     }

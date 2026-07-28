@@ -18,7 +18,8 @@ const MENU_SELECT = `
 
 const ORDERS_SELECT = `
   SELECT o.id, o.code, o.table_number AS table, o.customer_name AS customer, o.phone,
-         o.method, o.status, o.total::float AS total, o.discount::float AS discount, o.created_at AS "createdAt",
+         o.method, o.status, o.total::float AS total, o.discount::float AS discount,
+         o.tax::float AS tax, o.service_charge::float AS "serviceCharge", o.created_at AS "createdAt",
          o.payment_collected AS "paymentCollected", o.collected_by AS "collectedBy", o.collected_at AS "collectedAt",
          COALESCE(json_agg(json_build_object(
            'id', oi.menu_item_id, 'name', oi.name, 'price', oi.price::float,
@@ -58,6 +59,21 @@ async function orderCountForPhone(client, tenantId, phone) {
   return rows[0] ? rows[0].n : 0;
 }
 
+/* The single source of truth for what an order costs. Checkout shows these
+   same lines to the customer, and the Razorpay charge is built from the same
+   total — so the amount displayed, the amount charged and the amount stored
+   can never drift apart. */
+const GST_RATE = 0.05;
+const SERVICE_RATE = 0.03;
+
+async function priceOrder(client, tenant, items, phone) {
+  const subtotal = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
+  const tax = Math.round(subtotal * GST_RATE);
+  const serviceCharge = Math.round(subtotal * SERVICE_RATE);
+  const discount = await loyaltyDiscount(client, tenant, phone, subtotal);
+  return { subtotal, tax, serviceCharge, discount, total: Math.max(0, subtotal + tax + serviceCharge - discount) };
+}
+
 /* Loyalty reward on every Nth order from the same phone number. Always
    recomputed here on the server — the browser tells us the cart, never the
    discount, so a customer can't hand themselves a reward they didn't earn. */
@@ -75,10 +91,8 @@ async function createOrder(client, tenantId, body) {
   const items = Array.isArray(body.items) ? body.items : [];
   if (!items.length) throw Object.assign(new Error("Order has no items"), { status: 400 });
   const table = body.table ? Number(body.table) : null;
-  const subtotal = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
   const tenant = (await client.query("SELECT * FROM tenants WHERE id=$1", [tenantId])).rows[0];
-  const discount = await loyaltyDiscount(client, tenant, body.phone, subtotal);
-  const total = Math.max(0, subtotal - discount);
+  const { tax, serviceCharge, discount, total } = await priceOrder(client, tenant, items, body.phone);
   const code = await nextOrderCode(client, tenantId);
   const method = body.method || "Cash";
   // Cash needs someone to physically collect it; every other method (Card/UPI,
@@ -89,9 +103,9 @@ async function createOrder(client, tenantId, body) {
   // year) — this is how each year's orders/payments/analytics stay separate.
   const sessionId = await getActiveSessionId(client, tenantId);
   const order = (await client.query(
-    `INSERT INTO orders (tenant_id, session_id, code, table_number, customer_name, phone, method, status, total, discount, payment_collected)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10) RETURNING id, code`,
-    [tenantId, sessionId, code, table, body.customer || "Guest", body.phone || "", method, total, discount, paymentCollected]
+    `INSERT INTO orders (tenant_id, session_id, code, table_number, customer_name, phone, method, status, total, tax, service_charge, discount, payment_collected)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,$11,$12) RETURNING id, code`,
+    [tenantId, sessionId, code, table, body.customer || "Guest", body.phone || "", method, total, tax, serviceCharge, discount, paymentCollected]
   )).rows[0];
   for (const it of items) {
     await client.query(
@@ -391,7 +405,7 @@ r.get("/combos", auth, h(async (req, res) => {
             COALESCE(json_agg(json_build_object('id', ci.menu_item_id, 'qty', ci.qty))
               FILTER (WHERE ci.id IS NOT NULL), '[]') AS items
      FROM menu_items m LEFT JOIN combo_items ci ON ci.combo_id = m.id
-     WHERE m.tenant_id=$1 AND m.is_combo ORDER BY m.name`, [req.user.tid]);
+     WHERE m.tenant_id=$1 AND m.is_combo GROUP BY m.id ORDER BY m.name`, [req.user.tid]);
   res.json(rows);
 }));
 
@@ -588,11 +602,10 @@ r.post("/public/:slug/razorpay/order", h(loadTenant), h(async (req, res) => {
   if (!keyId || !keySecret) return res.status(400).json({ error: "Online payments aren't set up for this restaurant yet" });
   const items = Array.isArray(req.body?.items) ? req.body.items : [];
   if (!items.length) return res.status(400).json({ error: "Your cart is empty" });
-  const subtotal = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
-  // Charge exactly what createOrder will record as the order total, or the
-  // customer would be billed full price for an order stored as discounted.
-  const discount = await loyaltyDiscount({ query: q }, req.tenant, req.body?.phone, subtotal);
-  const amountPaise = Math.round(Math.max(0, subtotal - discount) * 100);
+  // Charge exactly what createOrder will record as the order total — same
+  // helper, so tax, service charge and any loyalty discount all line up.
+  const { total } = await priceOrder({ query: q }, req.tenant, items, req.body?.phone);
+  const amountPaise = Math.round(total * 100);
   if (amountPaise < 100) return res.status(400).json({ error: "Order amount is too small to pay online" });
 
   const resp = await fetch("https://api.razorpay.com/v1/orders", {

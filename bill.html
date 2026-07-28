@@ -88,6 +88,9 @@
               </tbody>
             </table>
             <div class="bill-totals">
+              <div class="row"><span>Subtotal</span><span>${App.money(order.total - order.tax - order.serviceCharge + order.discount)}</span></div>
+              ${order.tax ? `<div class="row"><span>GST (5%)</span><span>${App.money(order.tax)}</span></div>` : ""}
+              ${order.serviceCharge ? `<div class="row"><span>Service charge</span><span>${App.money(order.serviceCharge)}</span></div>` : ""}
               ${order.discount ? `<div class="row"><span>Loyalty reward</span><span>− ${App.money(order.discount)}</span></div>` : ""}
               <div class="row grand"><span>Total paid</span><span>${App.money(order.total)}</span></div>
             </div>

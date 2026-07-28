@@ -267,5 +267,10 @@ App.setNotifDot = (show) => { const d = document.getElementById("tbDot"); if (d)
 (function () {
   const table = new URLSearchParams(location.search).get("table");
   // Scanning a table's QR is unambiguously a dine-in order.
-  if (table) { App.setTableNo(table); App.setTableLocked(true); App.setOrderType("dine-in"); }
+  if (table) { App.setTableNo(table); App.setTableLocked(true); App.setOrderType("dine-in"); return; }
+  // Reaching the landing page WITHOUT a ?table= means this visit didn't come
+  // from a table QR. Release any lock left over from an earlier scan —
+  // otherwise that device stays pinned to dine-in forever and the customer
+  // never gets offered takeaway again.
+  if (/(^|\/)index\.html$/.test(location.pathname) || location.pathname === "/") App.setTableLocked(false);
 })();

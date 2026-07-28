@@ -38,6 +38,8 @@ const App = (() => {
     send:    '<path d="M4 12 20 4l-6.5 16-2.7-7L4 12Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>',
     lock:    '<rect x="4.5" y="10.5" width="15" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="15" r="1.6"/>',
     rupee:   '<text x="12" y="17.5" text-anchor="middle" font-size="16" font-weight="700" fill="currentColor" font-family="Georgia, \'Times New Roman\', serif">₹</text>',
+    car:     '<path d="M4 16v-3.2L6 8h12l2 4.8V16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M3.5 16h17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="7.5" cy="18" r="1.7" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16.5" cy="18" r="1.7" fill="none" stroke="currentColor" stroke-width="2"/>',
+    dinein:  '<path d="M7 3v6a2.5 2.5 0 0 0 5 0V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9.5 11v10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 3c-1.4 1-2 3-2 5.2 0 1.5.8 2.4 2 2.6V21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   };
 
   /* ---- Brand mark (uploaded logo, or leaf icon fallback) ---- */
@@ -139,6 +141,16 @@ const App = (() => {
   const isTableLocked = () => localStorage.getItem(LOCK_KEY) === "1";
   const setTableLocked = (v) => v ? localStorage.setItem(LOCK_KEY, "1") : localStorage.removeItem(LOCK_KEY);
 
+  /* ---- Order type: "dine-in" (a table number) or "takeaway" (no table, a
+     vehicle number instead — this is what car service uses too). ---- */
+  const TYPE_KEY = "foodhouse-orderType";
+  const VEHICLE_KEY = "foodhouse-vehicle";
+  const getOrderType = () => localStorage.getItem(TYPE_KEY) || "dine-in";
+  const setOrderType = (t) => localStorage.setItem(TYPE_KEY, t === "takeaway" ? "takeaway" : "dine-in");
+  const isTakeaway = () => getOrderType() === "takeaway";
+  const getVehicle = () => localStorage.getItem(VEHICLE_KEY) || "";
+  const setVehicle = (v) => localStorage.setItem(VEHICLE_KEY, (v || "").toUpperCase());
+
   /* ---- Customer identity (name + phone), captured once via a gate modal
      before the first item is added to the cart. Stored per restaurant so
      switching restaurants asks again. Powers "My Orders" phone lookup,
@@ -157,6 +169,7 @@ const App = (() => {
 
   return { money, icon, ICONS, imgFallback, toast, whatsappOrderLink, brandBar, brandMark, bottomNav,
            getTableNo, setTableNo, isTableLocked, setTableLocked,
+           getOrderType, setOrderType, isTakeaway, getVehicle, setVehicle,
            getCustomer, setCustomer, timeAgo };
 })();
 
@@ -253,5 +266,6 @@ App.setNotifDot = (show) => { const d = document.getElementById("tbDot"); if (d)
    Here we just lock the table number when it arrives via a table QR. */
 (function () {
   const table = new URLSearchParams(location.search).get("table");
-  if (table) { App.setTableNo(table); App.setTableLocked(true); }
+  // Scanning a table's QR is unambiguously a dine-in order.
+  if (table) { App.setTableNo(table); App.setTableLocked(true); App.setOrderType("dine-in"); }
 })();

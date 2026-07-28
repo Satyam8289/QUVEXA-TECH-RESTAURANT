@@ -18,6 +18,7 @@ const MENU_SELECT = `
 
 const ORDERS_SELECT = `
   SELECT o.id, o.code, o.table_number AS table, o.customer_name AS customer, o.phone,
+         o.order_type AS "orderType", o.vehicle_number AS "vehicleNumber",
          o.method, o.status, o.total::float AS total, o.discount::float AS discount,
          o.tax::float AS tax, o.service_charge::float AS "serviceCharge", o.created_at AS "createdAt",
          o.payment_collected AS "paymentCollected", o.collected_by AS "collectedBy", o.collected_at AS "collectedAt",
@@ -90,7 +91,14 @@ export async function loyaltyDiscount(client, tenant, phone, subtotal) {
 async function createOrder(client, tenantId, body) {
   const items = Array.isArray(body.items) ? body.items : [];
   if (!items.length) throw Object.assign(new Error("Order has no items"), { status: 400 });
-  const table = body.table ? Number(body.table) : null;
+
+  // Takeaway (which covers car service) has no table and must be paid online —
+  // there's no waiter to collect cash from someone who isn't seated.
+  const orderType = body.orderType === "takeaway" ? "takeaway" : "dine-in";
+  const vehicleNumber = orderType === "takeaway" ? String(body.vehicleNumber || "").trim().toUpperCase() : null;
+  if (orderType === "takeaway" && !vehicleNumber)
+    throw Object.assign(new Error("Please enter your vehicle number"), { status: 400 });
+  const table = orderType === "takeaway" ? null : (body.table ? Number(body.table) : null);
   const tenant = (await client.query("SELECT * FROM tenants WHERE id=$1", [tenantId])).rows[0];
   const { tax, serviceCharge, discount, total } = await priceOrder(client, tenant, items, body.phone);
   const code = await nextOrderCode(client, tenantId);
@@ -103,9 +111,11 @@ async function createOrder(client, tenantId, body) {
   // year) — this is how each year's orders/payments/analytics stay separate.
   const sessionId = await getActiveSessionId(client, tenantId);
   const order = (await client.query(
-    `INSERT INTO orders (tenant_id, session_id, code, table_number, customer_name, phone, method, status, total, tax, service_charge, discount, payment_collected)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,$11,$12) RETURNING id, code`,
-    [tenantId, sessionId, code, table, body.customer || "Guest", body.phone || "", method, total, tax, serviceCharge, discount, paymentCollected]
+    `INSERT INTO orders (tenant_id, session_id, code, table_number, customer_name, phone, method, status,
+                         total, tax, service_charge, discount, payment_collected, order_type, vehicle_number)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,$11,$12,$13,$14) RETURNING id, code`,
+    [tenantId, sessionId, code, table, body.customer || "Guest", body.phone || "", method, total, tax,
+     serviceCharge, discount, paymentCollected, orderType, vehicleNumber]
   )).rows[0];
   for (const it of items) {
     await client.query(
@@ -548,6 +558,10 @@ r.post("/public/:slug/orders", h(loadTenant), h(async (req, res) => {
   // Server-side enforcement of "Close Store" — a customer can't bypass the
   // UI and place an order directly against the API while the store is shut.
   if (req.tenant.is_closed) return res.status(403).json({ error: "This restaurant is currently closed for new orders." });
+  // Takeaway/car-service must be prepaid, so it can only arrive via the
+  // Razorpay verify route below — never through this pay-later path.
+  if ((req.body || {}).orderType === "takeaway")
+    return res.status(400).json({ error: "Takeaway and car-service orders must be paid online." });
   const order = await tx((c) => createOrder(c, req.tenant.id, req.body || {}));
   res.status(201).json(order);
 }));

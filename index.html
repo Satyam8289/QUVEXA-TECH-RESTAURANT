@@ -31,11 +31,28 @@
     </section>
 
     <div class="table-picker">
-      <div class="field">
+      <div class="field" id="tableField">
         <label for="table">Your table number</label>
         <input class="input" id="table" type="number" min="1" max="12" inputmode="numeric" placeholder="e.g. 4" />
       </div>
       <a class="btn btn-block btn-lg" id="viewMenu" href="menu.html">View Menu <span id="arrow"></span></a>
+    </div>
+
+    <!-- Asked on "View Menu" when the customer didn't arrive from a table QR -->
+    <div class="modal-back" id="typeBack" style="position:fixed;inset:0;background:rgba(12,30,20,.5);backdrop-filter:blur(3px);z-index:70;display:none;align-items:center;justify-content:center;padding:20px">
+      <div class="card" style="width:100%;max-width:400px;padding:26px 24px">
+        <h3 style="font-family:var(--serif);font-size:20px;margin-bottom:6px">How are you ordering?</h3>
+        <p style="color:var(--muted);font-size:13.5px;margin-bottom:18px">Pick one so we know where to bring your food.</p>
+        <button type="button" class="type-opt" data-type="dine-in">
+          <span class="type-ico" id="tiDine"></span>
+          <span><b>Dine-in</b><small>Eating at a table here</small></span>
+        </button>
+        <button type="button" class="type-opt" data-type="takeaway" id="takeawayOpt">
+          <span class="type-ico" id="tiCar"></span>
+          <span><b>Takeaway / Car service</b><small id="takeawaySub">Pick up at the counter or in your car</small></span>
+        </button>
+        <button type="button" class="btn btn-ghost btn-block" id="typeCancel" style="margin-top:6px">Cancel</button>
+      </div>
     </div>
 
     <div class="feature-row">
@@ -80,9 +97,48 @@
     } else {
       tableInput.addEventListener("input", () => { App.setTableNo(tableInput.value); App.setTableLocked(false); });
     }
-    document.getElementById("viewMenu").addEventListener("click", () => {
-      if (tableInput.value) App.setTableNo(tableInput.value);
+    /* Order type. Arriving from a table QR settles it (dine-in, table already
+       known); otherwise "View Menu" asks first, since takeaway/car service
+       needs a vehicle number and prepayment instead of a table. */
+    const typeBack = document.getElementById("typeBack");
+    const cameFromTableQR = App.isTableLocked() && App.getTableNo();
+    let razorpayReady = false;
+
+    document.getElementById("tiDine").innerHTML = App.icon("dinein", 22);
+    document.getElementById("tiCar").innerHTML = App.icon("car", 22);
+    if (cameFromTableQR) App.setOrderType("dine-in");
+    applyTypeToForm();
+
+    function applyTypeToForm() {
+      // A takeaway order has no table, so hide the field entirely.
+      document.getElementById("tableField").style.display = App.isTakeaway() ? "none" : "";
+    }
+
+    document.getElementById("viewMenu").addEventListener("click", (e) => {
+      if (cameFromTableQR) { App.setTableNo(tableInput.value); return; }
+      e.preventDefault();
+      typeBack.style.display = "flex";
     });
+    document.getElementById("typeCancel").addEventListener("click", () => { typeBack.style.display = "none"; });
+    typeBack.addEventListener("click", (e) => { if (e.target === typeBack) typeBack.style.display = "none"; });
+
+    typeBack.querySelectorAll("[data-type]").forEach((b) => b.addEventListener("click", () => {
+      const type = b.dataset.type;
+      if (type === "takeaway" && !razorpayReady) {
+        App.toast("This restaurant isn't accepting takeaway orders right now");
+        return;
+      }
+      App.setOrderType(type);
+      applyTypeToForm();
+      if (type === "dine-in" && !tableInput.value) {
+        typeBack.style.display = "none";
+        App.toast("Please enter your table number");
+        tableInput.focus();
+        return;
+      }
+      if (type === "dine-in") App.setTableNo(tableInput.value);
+      location.href = "menu.html";
+    }));
 
     async function main() {
       try {
@@ -93,6 +149,13 @@
         document.getElementById("tname").textContent = data.tenant.name;
         document.getElementById("ttag").textContent  = data.tenant.tagline || "";
         document.getElementById("addr").textContent  = data.tenant.address || "";
+        // Takeaway must be prepaid, so it's only offered once the restaurant
+        // has connected Razorpay — otherwise there's no way to pay for it.
+        razorpayReady = !!data.tenant.razorpayEnabled;
+        if (!razorpayReady) {
+          document.getElementById("takeawayOpt").classList.add("disabled");
+          document.getElementById("takeawaySub").textContent = "Not available at this restaurant yet";
+        }
       } catch (e) {
         App.toast("Can't reach the restaurant server. Please check your connection.");
       }

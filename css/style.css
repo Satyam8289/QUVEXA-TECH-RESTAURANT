@@ -300,6 +300,22 @@ textarea.input { resize: vertical; min-height: 76px; }
   transition: border-color .15s, background .15s, box-shadow .15s;
 }
 .pay.active { border-color: var(--green-600); background: var(--green-50); color: var(--green-800); box-shadow: 0 0 0 3px var(--green-50); }
+/* Dine-in vs Takeaway/Car chooser (shown on "View Menu") */
+.type-opt {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; margin-bottom: 10px;
+  padding: 15px 16px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--white);
+  transition: border-color .15s, background .15s;
+}
+.type-opt:hover { border-color: var(--green-600); background: var(--green-50); }
+.type-opt b { font-size: 14.5px; display: block; }
+.type-opt small { color: var(--muted); font-size: 12.5px; }
+.type-opt .type-ico {
+  flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--green-50); color: var(--green-700);
+}
+.type-opt.disabled { opacity: .5; }
+.type-opt.disabled:hover { border-color: var(--line); background: var(--white); }
+
 /* COMBO badge on a customer-facing dish card */
 .combo-tag {
   font-size: 9.5px; font-weight: 800; letter-spacing: .07em; padding: 2px 6px; border-radius: 6px;

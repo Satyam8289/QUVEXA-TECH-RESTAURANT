@@ -135,6 +135,10 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount NUMERIC(10,2) NOT NULL DEFA
 -- past bill still shows what was actually charged if the rates ever change.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax NUMERIC(10,2) NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_charge NUMERIC(10,2) NOT NULL DEFAULT 0;
+-- 'dine-in' uses a table number; 'takeaway' (incl. car service) uses no table
+-- at all and carries the customer's vehicle number instead.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_type TEXT NOT NULL DEFAULT 'dine-in';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS vehicle_number TEXT;
 
 -- Private feedback: only the restaurant ever sees this. Asking here rather
 -- than on a public review site is the point — the owner hears about a bad

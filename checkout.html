@@ -22,9 +22,13 @@
             <label for="phone">Phone number (for WhatsApp updates)</label>
             <input class="input" id="phone" type="tel" required inputmode="tel" placeholder="+91 98765 43210" />
           </div>
-          <div class="field" style="margin-bottom:0">
+          <div class="field" style="margin-bottom:0" id="tableField">
             <label for="table">Table number</label>
             <input class="input" id="table" type="number" min="1" max="12" required placeholder="e.g. 4" />
+          </div>
+          <div class="field" style="margin-bottom:0;display:none" id="vehicleField">
+            <label for="vehicle">Vehicle number</label>
+            <input class="input" id="vehicle" placeholder="e.g. MH 12 AB 3456" autocomplete="off" style="text-transform:uppercase" />
           </div>
         </div>
       </div>
@@ -72,9 +76,22 @@
 
     let method = "Online";
     let razorpayEnabled = false;
-    document.getElementById("payMethods").innerHTML = `
-      <button type="button" class="pay" data-pay="Cash"><span class="pay-ico">${App.icon("rupee", 17)}</span>Cash</button>
-      <button type="button" class="pay active" data-pay="Online"><span class="pay-ico">${App.icon("card", 17)}</span>Card / UPI</button>`;
+    // Takeaway (and car service) is prepaid — Cash isn't an option there,
+    // because there's no waiter to collect it from someone who isn't seated.
+    const TAKEAWAY = App.isTakeaway();
+    document.getElementById("payMethods").innerHTML = TAKEAWAY
+      ? `<button type="button" class="pay active" data-pay="Online" style="grid-column:1/-1"><span class="pay-ico">${App.icon("card", 17)}</span>Card / UPI — pay now</button>`
+      : `<button type="button" class="pay" data-pay="Cash"><span class="pay-ico">${App.icon("rupee", 17)}</span>Cash</button>
+         <button type="button" class="pay active" data-pay="Online"><span class="pay-ico">${App.icon("card", 17)}</span>Card / UPI</button>`;
+
+    const vehicleInput = document.getElementById("vehicle");
+    if (TAKEAWAY) {
+      document.getElementById("tableField").style.display = "none";
+      document.getElementById("table").required = false;
+      document.getElementById("vehicleField").style.display = "";
+      vehicleInput.required = true;
+      vehicleInput.value = App.getVehicle();
+    }
     const tableField = document.getElementById("table");
     tableField.value = App.getTableNo();
     // If the table came from scanning its QR, lock it so it can't be changed.
@@ -152,8 +169,11 @@
       const name = document.getElementById("name").value.trim();
       const phone = document.getElementById("phone").value.trim();
       const table = document.getElementById("table").value.trim();
-      if (!name || !phone || !table) { App.toast("Please fill all fields"); return; }
-      App.setTableNo(table);
+      const vehicle = vehicleInput.value.trim().toUpperCase();
+      if (!name || !phone) { App.toast("Please fill all fields"); return; }
+      if (TAKEAWAY && !vehicle) { App.toast("Please enter your vehicle number"); return; }
+      if (!TAKEAWAY && !table) { App.toast("Please enter your table number"); return; }
+      if (TAKEAWAY) App.setVehicle(vehicle); else App.setTableNo(table);
       App.setCustomer({ name, phone });
 
       const items = Cart.all().map(l => ({ id: l.id, name: l.name, qty: l.qty, price: l.price, note: l.note || "" }));
@@ -171,7 +191,7 @@
             amount: rzp.amount,
             currency: rzp.currency,
             name: tenantName,
-            description: `Table ${table}`,
+            description: TAKEAWAY ? `Takeaway · ${vehicle}` : `Table ${table}`,
             prefill: { name, contact: phone },
             theme: { color: "#0f5132" },
             handler: async (resp) => {
@@ -181,7 +201,8 @@
                   razorpay_order_id: resp.razorpay_order_id,
                   razorpay_payment_id: resp.razorpay_payment_id,
                   razorpay_signature: resp.razorpay_signature,
-                  table: Number(table), customer: name, phone, items,
+                  table: TAKEAWAY ? null : Number(table), customer: name, phone, items,
+                  orderType: TAKEAWAY ? "takeaway" : "dine-in", vehicleNumber: vehicle,
                 });
                 localStorage.setItem("foodhouse-lastOrder", order.code);
                 Cart.clear();
@@ -202,12 +223,16 @@
         return;
       }
 
+      // Takeaway can only be prepaid, so it must never reach this pay-later
+      // path — the server rejects it too, but fail clearly here first.
+      if (TAKEAWAY) { App.toast("Takeaway orders must be paid online. Please try again."); resetBtn(); return; }
+
       // Fallback for restaurants that haven't connected Razorpay yet: treat
       // Card/UPI like the counter handles it today — collected on the spot.
       const orderMethod = method === "Online" ? "Card/UPI" : method;
       submitBtn.disabled = true; submitBtn.textContent = "Placing order…";
       try {
-        const order = await Api.placeOrderPublic({ table: Number(table), customer: name, phone, method: orderMethod, items });
+        const order = await Api.placeOrderPublic({ table: Number(table), customer: name, phone, method: orderMethod, items, orderType: "dine-in" });
         localStorage.setItem("foodhouse-lastOrder", order.code);
         Cart.clear();
         location.href = "thankyou.html";

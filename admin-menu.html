@@ -71,7 +71,17 @@
         <div class="field full"><label>Combo name</label><input class="input" id="c-name" required placeholder="e.g. Veg Thali Combo" /></div>
         <div class="field"><label>Combo price (₹)</label><input class="input" id="c-price" type="number" min="0" required /></div>
         <div class="field"><label>Category</label><select class="input" id="c-cat"></select></div>
-        <div class="field full"><label>Photo URL (optional)</label><input class="input" id="c-image" placeholder="https://…" /></div>
+        <div class="field full">
+          <label>Photo</label>
+          <div class="logo-uploader" style="margin-bottom:10px">
+            <div class="logo-preview" id="comboPreview" style="width:56px;height:56px"></div>
+            <div>
+              <label class="upload-btn">Upload photo<input type="file" id="comboImageInput" accept="image/*" hidden></label>
+              <div class="settings-hint">Or paste an image URL below · under 1.5 MB.</div>
+            </div>
+          </div>
+          <input class="input" id="c-image" placeholder="https://…  (leave blank for a branded placeholder)" />
+        </div>
       </div>
       <label style="font-size:13px;font-weight:600;color:var(--muted);display:block;margin:6px 0 8px">Dishes in this combo</label>
       <div id="comboPicker" style="max-height:230px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;padding:6px"></div>
@@ -240,6 +250,28 @@
     /* ---------- Combos ---------- */
     const comboBack = document.getElementById("comboBack");
     const comboQty = {};   // menu item id -> qty chosen for the combo being built
+    const comboPreview = document.getElementById("comboPreview");
+    let pendingComboImage = null;   // data URL staged for upload, or null = use the URL field
+
+    function renderComboPreview(url) {
+      comboPreview.innerHTML = url ? `<img src="${url}" alt="preview" onerror="App.imgFallback(this)"/>` : App.icon("cutlery", 22);
+    }
+    document.getElementById("comboImageInput").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 1.5 * 1024 * 1024) { App.toast("Please use an image under 1.5 MB"); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        pendingComboImage = reader.result;
+        document.getElementById("c-image").value = "";
+        renderComboPreview(pendingComboImage);
+      };
+      reader.readAsDataURL(file);
+    });
+    document.getElementById("c-image").addEventListener("input", (e) => {
+      pendingComboImage = null;   // typing a URL overrides any staged upload
+      renderComboPreview(e.target.value.trim());
+    });
 
     function renderComboPicker() {
       const dishes = MENU.filter((m) => !m.isCombo);
@@ -282,6 +314,8 @@
       document.getElementById("c-name").value = "";
       document.getElementById("c-price").value = "";
       document.getElementById("c-image").value = "";
+      pendingComboImage = null;
+      renderComboPreview("");
       document.getElementById("c-cat").innerHTML = CATS.map((c) => `<option value="${c.slug}">${c.name}</option>`).join("");
       renderComboPicker();
       comboBack.classList.add("open");
@@ -294,12 +328,28 @@
       e.preventDefault();
       const items = Object.entries(comboQty).map(([id, qty]) => ({ id, qty }));
       if (!items.length) { App.toast("Pick at least one dish for the combo"); return; }
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+
+      let image = document.getElementById("c-image").value.trim();
+      if (pendingComboImage) {
+        submitBtn.textContent = "Uploading photo…";
+        try {
+          const res = await Api.uploadImage(pendingComboImage, "combo");
+          image = res.url;
+        } catch (ex) {
+          if (ex.message === "R2_NOT_CONFIGURED") image = pendingComboImage;   // local dev fallback
+          else { App.toast(ex.message || "Photo upload failed"); submitBtn.disabled = false; submitBtn.textContent = "Save combo"; return; }
+        }
+        submitBtn.textContent = "Save combo";
+      }
+
       try {
         await Api.saveCombo({
           name: document.getElementById("c-name").value.trim(),
           price: Number(document.getElementById("c-price").value),
           category: document.getElementById("c-cat").value,
-          image: document.getElementById("c-image").value.trim() || PLACEHOLDER,
+          image: image || PLACEHOLDER,
           items,
         });
         [MENU, COMBOS] = await Promise.all([Api.getMenu(), Api.getCombos()]);
@@ -307,6 +357,7 @@
         comboBack.classList.remove("open");
         renderGrid();
       } catch (ex) { App.toast(ex.message); }
+      submitBtn.disabled = false;
     });
 
     const PLACEHOLDER = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=70";

@@ -65,7 +65,7 @@
   <!-- Combo modal: pick existing dishes, set a bundle price -->
   <div class="modal-back" id="comboBack">
     <form class="modal card" id="comboForm" style="max-width:560px">
-      <h3>Add a combo</h3>
+      <h3 id="comboTitle">Add a combo</h3>
       <p class="settings-hint" style="margin:-6px 0 16px">Bundle dishes at a set price. Ordering a combo deducts stock from each dish inside it.</p>
       <div class="form-grid">
         <div class="field full"><label>Combo name</label><input class="input" id="c-name" required placeholder="e.g. Veg Thali Combo" /></div>
@@ -125,7 +125,7 @@
         </div>` : ""}
         <div class="menu-grid">${dishes.map(cardHTML).join("")}</div>`;
       document.getElementById("addBtn").addEventListener("click", () => openModal(null));
-      document.getElementById("addComboBtn").addEventListener("click", openComboModal);
+      document.getElementById("addComboBtn").addEventListener("click", () => openComboModal(null));
       bind();
     }
 
@@ -152,7 +152,10 @@
           <p>${parts.join(" + ") || "No dishes linked"}</p>
           <div class="mc-foot">
             <b>${App.money(c.price)}</b>
-            <a class="mc-edit" href="#" data-delcombo="${c.id}" style="color:var(--danger)">${App.icon("minus",14)} Delete</a>
+            <span style="display:flex;gap:12px">
+              <a class="mc-edit" href="#" data-editcombo="${c.id}">${App.icon("upload",14)} Edit</a>
+              <a class="mc-edit" href="#" data-delcombo="${c.id}" style="color:var(--danger)">${App.icon("minus",14)} Delete</a>
+            </span>
           </div>
         </div>
       </div>`;
@@ -181,6 +184,10 @@
     }
 
     function bind() {
+      document.querySelectorAll("[data-editcombo]").forEach((b) => b.addEventListener("click", (e) => {
+        e.preventDefault();
+        openComboModal(COMBOS.find((x) => x.id === b.dataset.editcombo));
+      }));
       document.querySelectorAll("[data-delcombo]").forEach((b) => b.addEventListener("click", async (e) => {
         e.preventDefault();
         const c = COMBOS.find((x) => x.id === b.dataset.delcombo);
@@ -309,14 +316,22 @@
         (price ? ` · Customer ${saves >= 0 ? "saves" : "pays extra"} <b style="color:${saves >= 0 ? "var(--green-700)" : "var(--danger)"}">${App.money(Math.abs(saves))}</b>` : "");
     }
 
-    function openComboModal() {
+    let editingComboId = null;   // null = creating a new combo
+
+    function openComboModal(combo) {
+      editingComboId = combo ? combo.id : null;
       Object.keys(comboQty).forEach((k) => delete comboQty[k]);
-      document.getElementById("c-name").value = "";
-      document.getElementById("c-price").value = "";
-      document.getElementById("c-image").value = "";
+      document.getElementById("comboTitle").textContent = combo ? "Edit combo" : "Add a combo";
+      document.getElementById("c-name").value = combo ? combo.name : "";
+      document.getElementById("c-price").value = combo ? combo.price : "";
+      document.getElementById("c-image").value = combo ? (combo.image || "") : "";
       pendingComboImage = null;
-      renderComboPreview("");
+      renderComboPreview(combo ? combo.image : "");
       document.getElementById("c-cat").innerHTML = CATS.map((c) => `<option value="${c.slug}">${c.name}</option>`).join("");
+      if (combo) {
+        if (combo.category) document.getElementById("c-cat").value = combo.category;
+        combo.items.forEach((p) => { comboQty[p.id] = p.qty; });
+      }
       renderComboPicker();
       comboBack.classList.add("open");
     }
@@ -346,6 +361,7 @@
 
       try {
         await Api.saveCombo({
+          id: editingComboId || undefined,
           name: document.getElementById("c-name").value.trim(),
           price: Number(document.getElementById("c-price").value),
           category: document.getElementById("c-cat").value,
@@ -353,7 +369,7 @@
           items,
         });
         [MENU, COMBOS] = await Promise.all([Api.getMenu(), Api.getCombos()]);
-        App.toast("Combo added");
+        App.toast(editingComboId ? "Combo updated" : "Combo added");
         comboBack.classList.remove("open");
         renderGrid();
       } catch (ex) { App.toast(ex.message); }

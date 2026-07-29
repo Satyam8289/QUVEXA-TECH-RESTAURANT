@@ -412,11 +412,13 @@ r.get("/customers", auth, requireRole("owner", "manager"), h(async (req, res) =>
    it bundles. Creating one is a single call so the two always stay in sync. */
 r.get("/combos", auth, h(async (req, res) => {
   const { rows } = await q(
-    `SELECT m.id, m.name, m.description, m.price::float AS price, m.image, m.veg,
+    `SELECT m.id, m.name, m.description, m.price::float AS price, m.image, m.veg, c.slug AS category,
             COALESCE(json_agg(json_build_object('id', ci.menu_item_id, 'qty', ci.qty))
               FILTER (WHERE ci.id IS NOT NULL), '[]') AS items
-     FROM menu_items m LEFT JOIN combo_items ci ON ci.combo_id = m.id
-     WHERE m.tenant_id=$1 AND m.is_combo GROUP BY m.id ORDER BY m.name`, [req.user.tid]);
+     FROM menu_items m
+     LEFT JOIN combo_items ci ON ci.combo_id = m.id
+     LEFT JOIN categories c ON c.id = m.category_id
+     WHERE m.tenant_id=$1 AND m.is_combo GROUP BY m.id, c.slug ORDER BY m.name`, [req.user.tid]);
   res.json(rows);
 }));
 
@@ -438,6 +440,30 @@ r.post("/combos", auth, requireRole("owner", "manager"), h(async (req, res) => {
     return row;
   });
   res.status(201).json(combo);
+}));
+
+r.put("/combos/:id", auth, requireRole("owner", "manager"), h(async (req, res) => {
+  const b = req.body || {};
+  const parts = Array.isArray(b.items) ? b.items.filter((it) => it.id) : [];
+  if (!b.name || !parts.length) return res.status(400).json({ error: "A combo needs a name and at least one dish" });
+  const catId = await categoryIdForSlug(req.user.tid, b.category);
+  const updated = await tx(async (c) => {
+    const row = (await c.query(
+      `UPDATE menu_items SET category_id=$1, name=$2, description=$3, price=$4, veg=$5, image=$6
+       WHERE id=$7 AND tenant_id=$8 AND is_combo RETURNING id`,
+      [catId, b.name, b.description || "", b.price || 0, b.veg !== false, b.image || "", req.params.id, req.user.tid]
+    )).rows[0];
+    if (!row) return null;
+    // Simplest correct way to keep the bundle in sync with what was submitted.
+    await c.query("DELETE FROM combo_items WHERE combo_id=$1", [row.id]);
+    for (const it of parts) {
+      await c.query("INSERT INTO combo_items (combo_id, menu_item_id, qty) VALUES ($1,$2,$3)",
+        [row.id, it.id, Number(it.qty) || 1]);
+    }
+    return row;
+  });
+  if (!updated) return res.status(404).json({ error: "Combo not found" });
+  res.json(updated);
 }));
 
 r.delete("/combos/:id", auth, requireRole("owner", "manager"), h(async (req, res) => {

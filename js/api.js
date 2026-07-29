@@ -110,7 +110,9 @@ const Api = (() => {
 
   /* Combos (staff side). */
   const getCombos = () => authReq("/combos");
-  const saveCombo = (combo) => authReq("/combos", { method: "POST", body: combo });
+  const saveCombo = (combo) => combo.id
+    ? authReq(`/combos/${combo.id}`, { method: "PUT", body: combo })
+    : authReq("/combos", { method: "POST", body: combo });
   const deleteCombo = (id) => authReq(`/combos/${id}`, { method: "DELETE" });
   const getFeedback = () => authReq("/feedback");
 

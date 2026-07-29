@@ -87,7 +87,11 @@
           <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:12px">Status updates automatically as the kitchen progresses. You can also collect it from reception.</p>
         </div>`;
 
-      if (order.status === "served") renderFeedback(order);
+      // Dine-in ends at "served". A takeaway customer collects the order the
+      // moment it's ready and walks off, so waiting for "served" would mean
+      // they're never asked to rate it.
+      const canRate = order.status === "served" || (order.orderType === "takeaway" && order.status === "ready");
+      if (canRate) renderFeedback(order);
     }
 
     /* Private rating — goes only to the restaurant. Once it's in, happy

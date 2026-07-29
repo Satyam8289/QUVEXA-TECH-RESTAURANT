@@ -92,13 +92,14 @@ async function createOrder(client, tenantId, body) {
   const items = Array.isArray(body.items) ? body.items : [];
   if (!items.length) throw Object.assign(new Error("Order has no items"), { status: 400 });
 
-  // Takeaway (which covers car service) has no table and must be paid online —
-  // there's no waiter to collect cash from someone who isn't seated.
-  const orderType = body.orderType === "takeaway" ? "takeaway" : "dine-in";
-  const vehicleNumber = orderType === "takeaway" ? String(body.vehicleNumber || "").trim().toUpperCase() : null;
-  if (orderType === "takeaway" && !vehicleNumber)
+  // Only dine-in uses a table. Takeaway is collected at the counter; car
+  // service is carried out to the customer, so that one needs a vehicle
+  // number. Neither can pay cash — nobody is seated to collect it from.
+  const orderType = ["takeaway", "car"].includes(body.orderType) ? body.orderType : "dine-in";
+  const vehicleNumber = orderType === "car" ? String(body.vehicleNumber || "").trim().toUpperCase() : null;
+  if (orderType === "car" && !vehicleNumber)
     throw Object.assign(new Error("Please enter your vehicle number"), { status: 400 });
-  const table = orderType === "takeaway" ? null : (body.table ? Number(body.table) : null);
+  const table = orderType === "dine-in" ? (body.table ? Number(body.table) : null) : null;
   const tenant = (await client.query("SELECT * FROM tenants WHERE id=$1", [tenantId])).rows[0];
   const { tax, serviceCharge, discount, total } = await priceOrder(client, tenant, items, body.phone);
   const code = await nextOrderCode(client, tenantId);
@@ -558,9 +559,9 @@ r.post("/public/:slug/orders", h(loadTenant), h(async (req, res) => {
   // Server-side enforcement of "Close Store" — a customer can't bypass the
   // UI and place an order directly against the API while the store is shut.
   if (req.tenant.is_closed) return res.status(403).json({ error: "This restaurant is currently closed for new orders." });
-  // Takeaway/car-service must be prepaid, so it can only arrive via the
+  // Takeaway and car service must be prepaid, so they can only arrive via the
   // Razorpay verify route below — never through this pay-later path.
-  if ((req.body || {}).orderType === "takeaway")
+  if (["takeaway", "car"].includes((req.body || {}).orderType))
     return res.status(400).json({ error: "Takeaway and car-service orders must be paid online." });
   const order = await tx((c) => createOrder(c, req.tenant.id, req.body || {}));
   res.status(201).json(order);

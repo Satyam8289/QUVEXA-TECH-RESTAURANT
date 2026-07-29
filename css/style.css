@@ -312,28 +312,33 @@ textarea.input { resize: vertical; min-height: 76px; }
 .ot-inner h2 { font-family: var(--serif); font-size: 26px; font-weight: 600; }
 .ot-inner p { color: var(--muted); font-size: 14px; margin: 6px 0 26px; }
 
-.ot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+/* Kiosk tiles: label on top, illustration filling the space below. */
+.ot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .ot-box {
-  aspect-ratio: 1 / 1;                    /* the square shape is the whole point */
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-  padding: 16px; border: 2px solid var(--line); border-radius: 22px; background: var(--white);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 16px 10px 10px; border: 2px solid var(--line); border-radius: 20px; background: var(--white);
   box-shadow: var(--shadow); transition: transform .12s, border-color .15s, background .15s;
 }
-.ot-box:hover, .ot-box:focus-visible { border-color: var(--green-600); background: var(--green-50); transform: translateY(-2px); }
+.ot-box:hover, .ot-box:focus-visible { border-color: var(--green-600); background: var(--green-50); transform: translateY(-3px); }
 .ot-box:active { transform: translateY(0); }
-.ot-box b { font-size: 17px; font-weight: 700; }
-.ot-box small { color: var(--muted); font-size: 12px; line-height: 1.35; padding: 0 4px; }
-.ot-box .ot-ico {
-  width: 62px; height: 62px; border-radius: 18px; display: grid; place-items: center;
-  background: var(--green-50); color: var(--green-700);
-}
-.ot-box.disabled { opacity: .45; box-shadow: none; }
+.ot-box b { font-family: var(--serif); font-size: 17px; font-weight: 600; display: block; }
+.ot-box small { color: var(--muted); font-size: 11px; line-height: 1.3; display: block; margin-top: 2px; }
+.ot-box .ot-art { width: 100%; height: auto; margin-top: auto; padding-top: 10px; }
+.ot-box.disabled { opacity: .4; box-shadow: none; }
 .ot-box.disabled:hover { border-color: var(--line); background: var(--white); transform: none; }
 
-@media (max-width: 360px) {
-  .ot-grid { grid-template-columns: 1fr; }
-  .ot-box { aspect-ratio: auto; flex-direction: row; justify-content: flex-start; gap: 14px; text-align: left; }
-  .ot-box .ot-ico { width: 48px; height: 48px; flex: none; }
+/* On a phone three portrait tiles get too narrow to read, so lay them out
+   as wide rows — label and caption on the left, illustration on the right. */
+@media (max-width: 560px) {
+  .ot-grid { grid-template-columns: 1fr; gap: 10px; }
+  .ot-box {
+    flex-direction: row; align-items: center; justify-content: space-between;
+    text-align: left; padding: 14px 18px; gap: 12px;
+  }
+  .ot-box > div { flex: 1; }
+  .ot-box .ot-art { width: 96px; flex: none; margin: 0; padding: 0; }
+  .ot-inner h2 { font-size: 23px; }
+  .ot-inner p { margin-bottom: 20px; }
 }
 
 /* COMBO badge on a customer-facing dish card */

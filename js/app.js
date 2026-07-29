@@ -141,16 +141,22 @@ const App = (() => {
   const isTableLocked = () => localStorage.getItem(LOCK_KEY) === "1";
   const setTableLocked = (v) => v ? localStorage.setItem(LOCK_KEY, "1") : localStorage.removeItem(LOCK_KEY);
 
-  /* ---- Order type: "dine-in" (a table number) or "takeaway" (no table, a
-     vehicle number instead — this is what car service uses too). ---- */
+  /* ---- Order type ----
+       dine-in  → served at a table
+       takeaway → collected at the counter
+       car      → brought out to the customer's car, so we need its number
+     The last two are prepaid; only dine-in uses a table. ---- */
   const TYPE_KEY = "foodhouse-orderType";
   const VEHICLE_KEY = "foodhouse-vehicle";
-  // Empty until the customer actually picks one on the menu overlay; anything
-  // that isn't "takeaway" behaves as dine-in.
+  const ORDER_TYPES = ["dine-in", "takeaway", "car"];
+  // Empty until the customer actually picks one on the menu overlay.
   const getOrderType = () => localStorage.getItem(TYPE_KEY) || "";
-  const setOrderType = (t) => localStorage.setItem(TYPE_KEY, t === "takeaway" ? "takeaway" : "dine-in");
+  const setOrderType = (t) => localStorage.setItem(TYPE_KEY, ORDER_TYPES.includes(t) ? t : "dine-in");
   const clearOrderType = () => localStorage.removeItem(TYPE_KEY);
-  const isTakeaway = () => getOrderType() === "takeaway";
+  const isDineIn = () => getOrderType() !== "takeaway" && getOrderType() !== "car";
+  const isTakeaway = () => !isDineIn();          // "not eating at a table here"
+  const needsVehicle = () => getOrderType() === "car";
+  const orderTypeLabel = (t) => ({ takeaway: "Takeaway", car: "Car service" }[t] || "Dine-in");
   const getVehicle = () => localStorage.getItem(VEHICLE_KEY) || "";
   const setVehicle = (v) => localStorage.setItem(VEHICLE_KEY, (v || "").toUpperCase());
 
@@ -172,7 +178,8 @@ const App = (() => {
 
   return { money, icon, ICONS, imgFallback, toast, whatsappOrderLink, brandBar, brandMark, bottomNav,
            getTableNo, setTableNo, isTableLocked, setTableLocked,
-           getOrderType, setOrderType, clearOrderType, isTakeaway, getVehicle, setVehicle,
+           getOrderType, setOrderType, clearOrderType, isDineIn, isTakeaway, needsVehicle, orderTypeLabel,
+           getVehicle, setVehicle,
            getCustomer, setCustomer, timeAgo };
 })();
 

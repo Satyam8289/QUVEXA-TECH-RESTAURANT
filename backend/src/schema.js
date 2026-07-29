@@ -144,7 +144,10 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS vehicle_number TEXT;
 -- every customer's name/phone/items. The public track/bill endpoints require
 -- this token; staff reach orders through the authenticated API instead.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS public_token TEXT;
-UPDATE orders SET public_token = encode(gen_random_bytes(9), 'hex') WHERE public_token IS NULL;
+-- Backfill old rows with a random token. md5(random()||id) needs no pgcrypto
+-- extension (gen_random_bytes does); new orders get a crypto-strong token
+-- generated in Node, see createOrder.
+UPDATE orders SET public_token = md5(random()::text || id::text) WHERE public_token IS NULL;
 
 -- Private feedback: only the restaurant ever sees this. Asking here rather
 -- than on a public review site is the point — the owner hears about a bad

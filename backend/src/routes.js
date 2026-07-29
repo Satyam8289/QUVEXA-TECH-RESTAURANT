@@ -661,12 +661,14 @@ r.get("/public/:slug/loyalty", h(loadTenant), h(async (req, res) => {
 /* Private feedback — stored for the restaurant's eyes only, never published.
    Tied to a real order code so it can't be spammed anonymously. */
 r.post("/public/:slug/feedback", h(loadTenant), h(async (req, res) => {
-  const { code, rating, comment } = req.body || {};
+  const { code, token, rating, comment } = req.body || {};
   const stars = Number(rating);
   if (!(stars >= 1 && stars <= 5)) return res.status(400).json({ error: "Please pick a rating from 1 to 5" });
-  const order = (await q("SELECT id, code, customer_name, phone FROM orders WHERE tenant_id=$1 AND code=$2",
+  const order = (await q("SELECT id, code, customer_name, phone, public_token FROM orders WHERE tenant_id=$1 AND code=$2",
     [req.tenant.id, code])).rows[0];
-  if (!order) return res.status(404).json({ error: "Order not found" });
+  // Require the order's token, same as viewing it — otherwise anyone could
+  // spam fake ratings against guessed (sequential) order codes.
+  if (!order || !order.public_token || token !== order.public_token) return res.status(404).json({ error: "Order not found" });
   const already = (await q("SELECT id FROM feedback WHERE tenant_id=$1 AND order_id=$2", [req.tenant.id, order.id])).rows[0];
   if (already) return res.status(409).json({ error: "You've already rated this order — thank you!" });
   await q(

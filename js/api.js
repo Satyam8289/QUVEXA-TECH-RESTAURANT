@@ -107,8 +107,8 @@ const Api = (() => {
   /* Loyalty preview + private feedback (customer side). */
   const loyaltyStatus = (phone, subtotal) =>
     req(`/public/${tenantSlug()}/loyalty?phone=${encodeURIComponent(phone || "")}&subtotal=${subtotal || 0}`);
-  const submitFeedback = (code, rating, comment) =>
-    req(`/public/${tenantSlug()}/feedback`, { method: "POST", body: { code, rating, comment } });
+  const submitFeedback = (code, token, rating, comment) =>
+    req(`/public/${tenantSlug()}/feedback`, { method: "POST", body: { code, token, rating, comment } });
 
   /* Combos (staff side). */
   const getCombos = () => authReq("/combos");

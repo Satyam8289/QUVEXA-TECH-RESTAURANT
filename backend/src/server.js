@@ -44,7 +44,9 @@ app.use((req, res) => res.status(404).json({ error: "Not found" }));
 app.use((err, _req, res, _next) => {
   const status = err.status || 500;
   if (status >= 500) console.error(err);
-  res.status(status).json({ error: err.message || "Server error" });
+  // 4xx messages are our own validation text (safe to show); 5xx could carry
+  // internal DB/stack detail, so return a generic message for those.
+  res.status(status).json({ error: status >= 500 ? "Something went wrong. Please try again." : (err.message || "Request failed") });
 });
 
 async function main() {

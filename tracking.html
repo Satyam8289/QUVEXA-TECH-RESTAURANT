@@ -127,7 +127,7 @@
         const btn = document.getElementById("fbSend");
         btn.disabled = true; btn.textContent = "Sending…";
         try {
-          const res = await Api.submitFeedback(order.code, chosenRating, document.getElementById("fbComment").value);
+          const res = await Api.submitFeedback(order.code, order.token || token, chosenRating, document.getElementById("fbComment").value);
           localStorage.setItem(ratedKey(order.code), String(chosenRating));
           renderThanks(slot, chosenRating, res.googleReviewUrl);
         } catch (e) {

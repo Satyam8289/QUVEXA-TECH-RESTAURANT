@@ -573,7 +573,16 @@ r.put("/settings", auth, requireRole("owner", "manager"), h(async (req, res) => 
 r.get("/stats", auth, h(async (req, res) => {
   const t = req.user.tid;
   const sessionId = await resolveSessionId(t, req.query.session);
-  const rev = (await q("SELECT COALESCE(SUM(total),0)::float AS revenue, COUNT(*)::int AS count FROM orders WHERE tenant_id=$1 AND session_id=$2", [t, sessionId])).rows[0];
+  // total = net + GST + service − discount. GST is the government's money
+  // (collected on their behalf, not earnings), so "revenue" is reported net of
+  // it; taxCollected/serviceCollected/grossCollected are surfaced separately.
+  const rev = (await q(
+    `SELECT COALESCE(SUM(total),0)::float               AS gross,
+            COALESCE(SUM(tax),0)::float                 AS "taxCollected",
+            COALESCE(SUM(service_charge),0)::float      AS "serviceCollected",
+            COALESCE(SUM(total - tax),0)::float         AS revenue,
+            COUNT(*)::int                               AS count
+     FROM orders WHERE tenant_id=$1 AND session_id=$2`, [t, sessionId])).rows[0];
   // Occupied tables is always the CURRENT live floor status, regardless of
   // which session is being viewed — a past year's tables aren't "occupied" now.
   const occ = (await q("SELECT COUNT(*)::int AS occupied, (SELECT COUNT(*)::int FROM restaurant_tables WHERE tenant_id=$1) AS total FROM restaurant_tables WHERE tenant_id=$1 AND status='occupied'", [t])).rows[0];
@@ -582,7 +591,10 @@ r.get("/stats", auth, h(async (req, res) => {
   // day's revenue. Strip it here so the rule is actually enforced server-side.
   const canSeeMoney = req.user.role === "owner" || req.user.role === "manager";
   res.json({
-    revenue: canSeeMoney ? rev.revenue : null,
+    revenue: canSeeMoney ? rev.revenue : null,           // net of GST
+    grossCollected: canSeeMoney ? rev.gross : null,       // what customers actually paid
+    taxCollected: canSeeMoney ? rev.taxCollected : null,  // GST owed to the government
+    serviceCollected: canSeeMoney ? rev.serviceCollected : null,
     count: rev.count,
     avg: canSeeMoney && rev.count ? Math.round(rev.revenue / rev.count) : null,
     occupied: occ.occupied, tables: occ.total,

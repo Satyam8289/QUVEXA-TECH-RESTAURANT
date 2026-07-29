@@ -64,14 +64,12 @@
     const formatDateTime = (iso) => new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
     const receiptLink = (code) => `bill.html?code=${encodeURIComponent(code)}&r=${SLUG}`;
 
-    /* Where the order goes: a table for dine-in, the counter for takeaway,
-       or the customer's car (shown by its number) for car service. */
-    const whereHTML = (o) => {
-      if (o.orderType !== "takeaway" && o.orderType !== "car") return `T${o.table ?? "—"}`;
-      const label = o.orderType === "car" ? "Car service" : "Take Out";
-      return `<span class="chip" style="background:var(--orange-50);color:var(--orange-600)">${label}</span>`
-        + (o.vehicleNumber ? `<br><small style="color:var(--muted)">${o.vehicleNumber}</small>` : "");
-    };
+    /* Where the order goes: a table for dine-in, or the customer's vehicle
+       for takeaway/car service, which has no table at all. */
+    const whereHTML = (o) => o.orderType === "takeaway"
+      ? `<span class="chip" style="background:var(--orange-50);color:var(--orange-600)">Takeaway</span>`
+        + (o.vehicleNumber ? `<br><small style="color:var(--muted)">${o.vehicleNumber}</small>` : "")
+      : `T${o.table ?? "—"}`;
 
     /* ---- Date-range filter, shared by Live Orders and Payments ---- */
     const DATE_RANGES = [["all", "All time"], ["today", "Today"], ["yesterday", "Yesterday"], ["week", "This week"], ["month", "This month"]];

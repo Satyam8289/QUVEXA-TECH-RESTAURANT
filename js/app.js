@@ -143,20 +143,19 @@ const App = (() => {
 
   /* ---- Order type ----
        dine-in  → served at a table
-       takeaway → collected at the counter
-       car      → brought out to the customer's car, so we need its number
-     The last two are prepaid; only dine-in uses a table. ---- */
+       takeaway → collected at the counter or brought out to the customer's
+                  car, so it carries a vehicle number instead of a table
+     Takeaway is prepaid; only dine-in uses a table. ---- */
   const TYPE_KEY = "foodhouse-orderType";
   const VEHICLE_KEY = "foodhouse-vehicle";
-  const ORDER_TYPES = ["dine-in", "takeaway", "car"];
   // Empty until the customer actually picks one on the menu overlay.
   const getOrderType = () => localStorage.getItem(TYPE_KEY) || "";
-  const setOrderType = (t) => localStorage.setItem(TYPE_KEY, ORDER_TYPES.includes(t) ? t : "dine-in");
+  const setOrderType = (t) => localStorage.setItem(TYPE_KEY, t === "takeaway" ? "takeaway" : "dine-in");
   const clearOrderType = () => localStorage.removeItem(TYPE_KEY);
-  const isDineIn = () => getOrderType() !== "takeaway" && getOrderType() !== "car";
-  const isTakeaway = () => !isDineIn();          // "not eating at a table here"
-  const needsVehicle = () => getOrderType() === "car";
-  const orderTypeLabel = (t) => ({ takeaway: "Takeaway", car: "Car service" }[t] || "Dine-in");
+  const isTakeaway = () => getOrderType() === "takeaway";
+  const isDineIn = () => !isTakeaway();
+  const needsVehicle = () => isTakeaway();
+  const orderTypeLabel = (t) => (t === "takeaway" ? "Takeaway / Car service" : "Dine-in");
   const getVehicle = () => localStorage.getItem(VEHICLE_KEY) || "";
   const setVehicle = (v) => localStorage.setItem(VEHICLE_KEY, (v || "").toUpperCase());
 

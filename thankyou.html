@@ -53,7 +53,7 @@
             `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:14px">
                <span>${it.qty} × ${it.name}</span><span>${App.money(it.price * it.qty)}</span></div>`).join("") +
           `<div style="display:flex;justify-content:space-between;padding-top:10px;margin-top:6px;border-top:1px dashed var(--line);font-weight:700">
-             <span>${order.orderType === "car" ? `Car service${order.vehicleNumber ? ` · ${order.vehicleNumber}` : ""}` : order.orderType === "takeaway" ? "Take Out" : `Table ${order.table ?? "—"}`} · ${order.method}</span><span>${App.money(order.total)}</span></div>`;
+             <span>${order.orderType === "takeaway" ? `Takeaway${order.vehicleNumber ? ` · ${order.vehicleNumber}` : ""}` : `Table ${order.table ?? "—"}`} · ${order.method}</span><span>${App.money(order.total)}</span></div>`;
         document.getElementById("billBtn").href = `bill.html?code=${encodeURIComponent(order.code)}&r=${Api.tenantSlug()}`;
       } catch (e) {
         location.href = "index.html";

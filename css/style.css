@@ -313,7 +313,7 @@ textarea.input { resize: vertical; min-height: 76px; }
 .ot-inner p { color: var(--muted); font-size: 14px; margin: 6px 0 26px; }
 
 /* Kiosk tiles: label on top, illustration filling the space below. */
-.ot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.ot-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 .ot-box {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 16px 10px 10px; border: 2px solid var(--line); border-radius: 20px; background: var(--white);
@@ -327,9 +327,9 @@ textarea.input { resize: vertical; min-height: 76px; }
 .ot-box.disabled { opacity: .4; box-shadow: none; }
 .ot-box.disabled:hover { border-color: var(--line); background: var(--white); transform: none; }
 
-/* On a phone three portrait tiles get too narrow to read, so lay them out
-   as wide rows — label and caption on the left, illustration on the right. */
-@media (max-width: 560px) {
+/* Two portrait tiles fit a phone fine; only on very narrow screens do they
+   need to become wide rows — label on the left, illustration on the right. */
+@media (max-width: 340px) {
   .ot-grid { grid-template-columns: 1fr; gap: 10px; }
   .ot-box {
     flex-direction: row; align-items: center; justify-content: space-between;

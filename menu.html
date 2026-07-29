@@ -69,34 +69,25 @@
         </button>
 
         <button type="button" class="ot-box" data-type="takeaway" id="otTakeaway">
-          <div><b>Take Out</b><small id="otTakeawaySub">Collect at the counter</small></div>
+          <div><b>Takeaway / Car Service</b><small id="otTakeawaySub">Brought out to your car</small></div>
           <svg class="ot-art" viewBox="0 0 120 92" aria-hidden="true">
-            <!-- handle -->
-            <path d="M50 26v-3a10 10 0 0 1 20 0v3" fill="none" stroke="var(--green-800)" stroke-width="3.2" stroke-linecap="round"/>
-            <!-- bag body -->
-            <path d="M36 26h48l-4 58a3 3 0 0 1-3 2.6H43a3 3 0 0 1-3-2.6Z" fill="var(--orange-50)" stroke="var(--green-800)" stroke-width="2.4" stroke-linejoin="round"/>
-            <!-- folded top -->
-            <rect x="33" y="20" width="54" height="10" rx="3" fill="var(--orange)"/>
-            <path d="M45 44h30" stroke="var(--green-800)" stroke-width="2.4" stroke-linecap="round" opacity=".35"/>
-          </svg>
-        </button>
-
-        <button type="button" class="ot-box" data-type="car" id="otCar">
-          <div><b>Car Service</b><small id="otCarSub">Brought to your car</small></div>
-          <svg class="ot-art" viewBox="0 0 120 92" aria-hidden="true">
+            <!-- takeaway bag riding along on the roof, so the tile reads as
+                 "food to your car" rather than just "a car" -->
+            <path d="M52 27h16l-1.4 16H53.4Z" fill="var(--orange-50)" stroke="var(--green-800)" stroke-width="2.2" stroke-linejoin="round"/>
+            <rect x="50" y="22" width="20" height="6" rx="2" fill="var(--orange)"/>
+            <path d="M56 22v-2a4 4 0 0 1 8 0v2" fill="none" stroke="var(--green-800)" stroke-width="2.2" stroke-linecap="round"/>
             <!-- cabin -->
-            <path d="M34 48l7-16a5 5 0 0 1 4.7-3.3h28.6A5 5 0 0 1 79 32l7 16Z" fill="var(--green-100)" stroke="var(--green-800)" stroke-width="2.4" stroke-linejoin="round"/>
-            <path d="M60 29v19" stroke="var(--green-800)" stroke-width="2.2"/>
+            <path d="M32 62l6-14a5 5 0 0 1 4.6-3h34.8a5 5 0 0 1 4.6 3l6 14Z" fill="var(--green-100)" stroke="var(--green-800)" stroke-width="2.4" stroke-linejoin="round"/>
+            <path d="M60 45v17" stroke="var(--green-800)" stroke-width="2.2"/>
             <!-- body -->
-            <path d="M22 68V54a6 6 0 0 1 6-6h64a6 6 0 0 1 6 6v14a3 3 0 0 1-3 3H25a3 3 0 0 1-3-3Z" fill="var(--orange)" stroke="var(--green-800)" stroke-width="2.4" stroke-linejoin="round"/>
-            <!-- lights -->
-            <rect x="24" y="56" width="8" height="5" rx="2.5" fill="#fff"/>
-            <rect x="88" y="56" width="8" height="5" rx="2.5" fill="#fff"/>
+            <path d="M20 78V66a6 6 0 0 1 6-6h68a6 6 0 0 1 6 6v12a3 3 0 0 1-3 3H23a3 3 0 0 1-3-3Z" fill="var(--orange)" stroke="var(--green-800)" stroke-width="2.4" stroke-linejoin="round"/>
+            <rect x="22" y="67" width="8" height="5" rx="2.5" fill="#fff"/>
+            <rect x="90" y="67" width="8" height="5" rx="2.5" fill="#fff"/>
             <!-- wheels -->
-            <circle cx="38" cy="71" r="8" fill="#2b332d" stroke="var(--green-800)" stroke-width="2.4"/>
-            <circle cx="82" cy="71" r="8" fill="#2b332d" stroke="var(--green-800)" stroke-width="2.4"/>
-            <circle cx="38" cy="71" r="3" fill="#c9d2cc"/>
-            <circle cx="82" cy="71" r="3" fill="#c9d2cc"/>
+            <circle cx="37" cy="81" r="7.5" fill="#2b332d" stroke="var(--green-800)" stroke-width="2.4"/>
+            <circle cx="83" cy="81" r="7.5" fill="#2b332d" stroke="var(--green-800)" stroke-width="2.4"/>
+            <circle cx="37" cy="81" r="2.8" fill="#c9d2cc"/>
+            <circle cx="83" cy="81" r="2.8" fill="#c9d2cc"/>
           </svg>
         </button>
       </div>
@@ -249,14 +240,12 @@
       const tableNo = App.getTableNo();
       if (App.isTableLocked() && tableNo) document.getElementById("otDineSub").textContent = `Served at table ${tableNo}`;
 
-      // Take Out and Car Service are prepaid, so they're only offered once the
-      // restaurant has connected Razorpay — otherwise there's no way to pay.
+      // Takeaway is prepaid, so it's only offered once the restaurant has
+      // connected Razorpay — otherwise there's no way to pay for it.
       const canPrepay = !!tenant.razorpayEnabled;
       if (!canPrepay) {
-        for (const [id, subId] of [["otTakeaway", "otTakeawaySub"], ["otCar", "otCarSub"]]) {
-          document.getElementById(id).classList.add("disabled");
-          document.getElementById(subId).textContent = "Not available here yet";
-        }
+        document.getElementById("otTakeaway").classList.add("disabled");
+        document.getElementById("otTakeawaySub").textContent = "Not available here yet";
       }
 
       overlay.classList.add("open");

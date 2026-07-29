@@ -78,7 +78,7 @@
               <span>${new Date(order.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>
             </div>
             <div class="bill-meta" style="margin-top:-10px">
-              <span>${order.orderType === "car" ? `Car service${order.vehicleNumber ? ` · ${order.vehicleNumber}` : ""}` : order.orderType === "takeaway" ? "Take Out" : `Table ${order.table ?? "—"}`} · ${order.customer || "Guest"}</span>
+              <span>${order.orderType === "takeaway" ? `Takeaway${order.vehicleNumber ? ` · ${order.vehicleNumber}` : ""}` : `Table ${order.table ?? "—"}`} · ${order.customer || "Guest"}</span>
               <span>${order.method}</span>
             </div>
             <table class="bill-table">

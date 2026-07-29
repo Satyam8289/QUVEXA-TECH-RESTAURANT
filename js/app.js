@@ -145,8 +145,11 @@ const App = (() => {
      vehicle number instead — this is what car service uses too). ---- */
   const TYPE_KEY = "foodhouse-orderType";
   const VEHICLE_KEY = "foodhouse-vehicle";
-  const getOrderType = () => localStorage.getItem(TYPE_KEY) || "dine-in";
+  // Empty until the customer actually picks one on the menu overlay; anything
+  // that isn't "takeaway" behaves as dine-in.
+  const getOrderType = () => localStorage.getItem(TYPE_KEY) || "";
   const setOrderType = (t) => localStorage.setItem(TYPE_KEY, t === "takeaway" ? "takeaway" : "dine-in");
+  const clearOrderType = () => localStorage.removeItem(TYPE_KEY);
   const isTakeaway = () => getOrderType() === "takeaway";
   const getVehicle = () => localStorage.getItem(VEHICLE_KEY) || "";
   const setVehicle = (v) => localStorage.setItem(VEHICLE_KEY, (v || "").toUpperCase());
@@ -169,7 +172,7 @@ const App = (() => {
 
   return { money, icon, ICONS, imgFallback, toast, whatsappOrderLink, brandBar, brandMark, bottomNav,
            getTableNo, setTableNo, isTableLocked, setTableLocked,
-           getOrderType, setOrderType, isTakeaway, getVehicle, setVehicle,
+           getOrderType, setOrderType, clearOrderType, isTakeaway, getVehicle, setVehicle,
            getCustomer, setCustomer, timeAgo };
 })();
 
@@ -265,13 +268,17 @@ App.setNotifDot = (show) => { const d = document.getElementById("tbDot"); if (d)
    Api.tenantSlug() already resolves & persists ?r= on every call.
    Here we just lock the table number when it arrives via a table QR. */
 (function () {
+  const onLanding = /(^|\/)index\.html$/.test(location.pathname) || location.pathname === "/";
+  // Landing here starts a fresh visit, so ask dine-in vs takeaway again on
+  // the menu rather than reusing whatever they picked last time.
+  if (onLanding) App.clearOrderType();
+
   const table = new URLSearchParams(location.search).get("table");
   // A table QR pins which table they're at, but not how they're ordering —
-  // someone seated may still want a parcel, so the landing page asks.
+  // someone seated may still want a parcel, so the menu overlay asks.
   if (table) { App.setTableNo(table); App.setTableLocked(true); return; }
-  // Reaching the landing page WITHOUT a ?table= means this visit didn't come
-  // from a table QR. Release any lock left over from an earlier scan —
-  // otherwise that device stays pinned to dine-in forever and the customer
-  // never gets offered takeaway again.
-  if (/(^|\/)index\.html$/.test(location.pathname) || location.pathname === "/") App.setTableLocked(false);
+  // No ?table= on the landing page means this visit didn't come from a table
+  // QR — release any lock left over from an earlier scan, or that device
+  // stays pinned to one table forever.
+  if (onLanding) App.setTableLocked(false);
 })();

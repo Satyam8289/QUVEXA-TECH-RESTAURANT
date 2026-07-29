@@ -37,6 +37,28 @@
     </a>
   </div>
 
+  <!-- Order-type overlay: covers the menu until the customer picks how
+       they're ordering, the way a McDonald's kiosk opens with Eat-in/Take-out -->
+  <div class="ot-overlay" id="otOverlay">
+    <div class="ot-inner">
+      <span class="ot-mark" id="otMark"></span>
+      <h2>How are you ordering?</h2>
+      <p>Tap one to start your order</p>
+      <div class="ot-grid">
+        <button type="button" class="ot-box" data-type="dine-in">
+          <span class="ot-ico" id="otDineIco"></span>
+          <b>Dine-in</b>
+          <small id="otDineSub">Eating at your table</small>
+        </button>
+        <button type="button" class="ot-box" data-type="takeaway" id="otTakeaway">
+          <span class="ot-ico" id="otCarIco"></span>
+          <b>Takeaway</b>
+          <small id="otTakeawaySub">Counter or car service</small>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Customer identity gate: asked once, before the first item is added -->
   <div class="modal-back" id="gateBack" style="position:fixed;inset:0;background:rgba(12,30,20,.5);backdrop-filter:blur(3px);z-index:70;display:none;align-items:center;justify-content:center;padding:20px">
     <form class="card" id="gateForm" style="width:100%;max-width:400px;padding:26px 24px">
@@ -171,6 +193,42 @@
     document.getElementById("vegOnly").addEventListener("change", e => { vegOnly = e.target.checked; renderMenu(); });
     document.addEventListener("cart:change", renderCartBar);
 
+    /* Kiosk-style order-type overlay. Shown once per visit (js/app.js clears
+       the choice whenever the customer lands on index.html again), covering
+       the menu until they pick — a table QR pins WHICH table they're at, but
+       not HOW they're ordering, since someone seated may still want a parcel. */
+    function showOrderTypeOverlay(tenant) {
+      if (App.getOrderType()) return;              // already chosen this visit
+      const overlay = document.getElementById("otOverlay");
+      document.getElementById("otMark").innerHTML = App.brandMark(54);
+      document.getElementById("otDineIco").innerHTML = App.icon("dinein", 30);
+      document.getElementById("otCarIco").innerHTML = App.icon("car", 30);
+
+      const tableNo = App.getTableNo();
+      if (App.isTableLocked() && tableNo) document.getElementById("otDineSub").textContent = `Eating here at table ${tableNo}`;
+
+      // Takeaway is prepaid, so it's only offered once Razorpay is connected.
+      const canTakeaway = !!tenant.razorpayEnabled;
+      if (!canTakeaway) {
+        document.getElementById("otTakeaway").classList.add("disabled");
+        document.getElementById("otTakeawaySub").textContent = "Not available here yet";
+      }
+
+      overlay.classList.add("open");
+      overlay.querySelectorAll("[data-type]").forEach((box) => box.addEventListener("click", () => {
+        const type = box.dataset.type;
+        if (type === "takeaway" && !canTakeaway) { App.toast("Takeaway isn't available at this restaurant yet"); return; }
+        if (type === "dine-in" && !tableNo) {
+          // No table known and no QR scanned — they have to say which table.
+          const t = (prompt("Which table are you at?") || "").trim();
+          if (!t) return;
+          App.setTableNo(t);
+        }
+        App.setOrderType(type);
+        overlay.classList.remove("open");
+      }));
+    }
+
     async function main() {
       try {
         const data = await Api.loadPublic();
@@ -192,6 +250,7 @@
         renderMenu();
         renderCartBar();
         App.mountBottomNav("menu");
+        showOrderTypeOverlay(data.tenant);
       } catch (e) {
         document.getElementById("menuList").innerHTML =
           `<div class="empty">${App.icon("alert",40)}<h3>Can't load the menu</h3><p>Please check your connection and try again.</p></div>`;

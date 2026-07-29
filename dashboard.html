@@ -62,13 +62,13 @@
     const dateStr = () => new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
     const viewHead = (sub, actions = "") => `<div class="view-head"><p>${sub}</p><div class="actions">${actions}</div></div>`;
     const formatDateTime = (iso) => new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
-    const receiptLink = (code) => `bill.html?code=${encodeURIComponent(code)}&r=${SLUG}`;
+    const receiptLink = (o) => `bill.html?code=${encodeURIComponent(o.code)}&t=${encodeURIComponent(o.token || "")}&r=${SLUG}`;
 
     /* Where the order goes: a table for dine-in, or the customer's vehicle
        for takeaway/car service, which has no table at all. */
     const whereHTML = (o) => o.orderType === "takeaway"
       ? `<span class="chip" style="background:var(--orange-50);color:var(--orange-600)">Takeaway</span>`
-        + (o.vehicleNumber ? `<br><small style="color:var(--muted)">${o.vehicleNumber}</small>` : "")
+        + (o.vehicleNumber ? `<br><small style="color:var(--muted)">${App.esc(o.vehicleNumber)}</small>` : "")
       : `T${o.table ?? "—"}`;
 
     /* ---- Date-range filter, shared by Live Orders and Payments ---- */
@@ -289,7 +289,7 @@
       orders = filterByDateRange(orders, dateKey);
       if (limit) orders = orders.slice(0, limit);
       const rows = orders.map((o) => {
-        const items = o.items.map((i) => `${i.qty}× ${i.name}`).join(", ");
+        const items = o.items.map((i) => `${i.qty}× ${App.esc(i.name)}`).join(", ");
         const opts = STATUSES.map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s[0].toUpperCase() + s.slice(1)}</option>`).join("");
         const payCell = o.paymentCollected
           ? (o.collectedBy ? `<span class="collected-by">${App.icon("check",13)} ${o.collectedBy}</span>` : `<span class="settled-tag">Settled</span>`)
@@ -297,13 +297,13 @@
         const phone = o.phone && o.phone !== "counter" ? o.phone : "";
         return `<tr>
           <td class="oid" data-label="Order #">${o.code}</td>
-          <td data-label="Customer"><b style="font-size:13px">${o.customer || "Guest"}</b>${phone ? `<br><small style="color:var(--muted)">${phone}</small>` : ""}</td>
+          <td data-label="Customer"><b style="font-size:13px">${App.esc(o.customer || "Guest")}</b>${phone ? `<br><small style="color:var(--muted)">${App.esc(phone)}</small>` : ""}</td>
           <td class="oitems" data-label="Items" title="${items}">${items}</td>
           <td data-label="Table">${whereHTML(o)}</td>
           <td data-label="Date" style="color:var(--muted);font-size:12.5px;white-space:nowrap">${formatDateTime(o.createdAt)}</td>
           <td data-label="Status"><span class="badge ${o.status}">${o.status}</span><br><select class="status-select" data-order="${o.id}" style="margin-top:5px">${opts}</select></td>
           <td data-label="Payment"><span class="chip" style="margin-bottom:4px">${o.method}</span><br>${payCell}</td>
-          <td data-label="Amount" style="white-space:nowrap"><b>${App.money(o.total)}</b> <a class="icon-btn" href="${receiptLink(o.code)}" target="_blank" rel="noopener" title="View receipt" style="width:26px;height:26px;vertical-align:middle;margin-left:4px">${App.icon("clipboard",13)}</a></td>
+          <td data-label="Amount" style="white-space:nowrap"><b>${App.money(o.total)}</b> <a class="icon-btn" href="${receiptLink(o)}" target="_blank" rel="noopener" title="View receipt" style="width:26px;height:26px;vertical-align:middle;margin-left:4px">${App.icon("clipboard",13)}</a></td>
         </tr>`;
       }).join("");
       return `<table class="otable otable-responsive"><thead><tr><th>Order #</th><th>Customer</th><th>Items</th><th>Table</th><th>Date</th><th>Status</th><th>Payment</th><th>Amount</th></tr></thead>
@@ -417,9 +417,9 @@
              <input type="checkbox" id="payPendingChk" ${payPendingOnly ? "checked" : ""} style="width:16px;height:16px"> Uncollected cash only</label>
            <div class="panel card"><div class="panel-head"><h3>Transactions</h3></div><div class="table-scroll">
             <table class="otable otable-responsive"><thead><tr><th>Order</th><th>Customer</th><th>Table</th><th>Method</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>`
-            + orders.map((o) => `<tr><td class="oid" data-label="Order">${o.code}</td><td data-label="Customer">${o.customer || "Guest"}</td><td data-label="Table">${whereHTML(o)}</td>
+            + orders.map((o) => `<tr><td class="oid" data-label="Order">${o.code}</td><td data-label="Customer">${App.esc(o.customer || "Guest")}</td><td data-label="Table">${whereHTML(o)}</td>
                 <td data-label="Method"><span class="chip">${o.method}</span></td><td data-label="Date" style="color:var(--muted);white-space:nowrap">${formatDateTime(o.createdAt)}</td>
-                <td data-label="Amount" style="white-space:nowrap"><b>${App.money(o.total)}</b> <a class="icon-btn" href="${receiptLink(o.code)}" target="_blank" rel="noopener" title="View receipt" style="width:26px;height:26px;vertical-align:middle;margin-left:4px">${App.icon("clipboard",13)}</a></td>
+                <td data-label="Amount" style="white-space:nowrap"><b>${App.money(o.total)}</b> <a class="icon-btn" href="${receiptLink(o)}" target="_blank" rel="noopener" title="View receipt" style="width:26px;height:26px;vertical-align:middle;margin-left:4px">${App.icon("clipboard",13)}</a></td>
                 <td data-label="Status">${o.paymentCollected ? `<span class="pill-badge paid">Paid</span>` : `<span class="pill-badge pendingpay">Pending</span>`}</td></tr>`).join("")
             + (orders.length ? "" : `<tr><td colspan="7" style="color:var(--muted);padding:22px;text-align:center">No transactions match this filter</td></tr>`)
             + `</tbody></table></div></div>`;
@@ -591,8 +591,8 @@
             <table class="otable otable-responsive"><thead><tr><th>Rating</th><th>Comment</th><th>Customer</th><th>Order</th><th>Date</th></tr></thead><tbody>`
           + list.map((f) => `<tr>
               <td data-label="Rating" style="white-space:nowrap">${starsFor(f.rating)}</td>
-              <td data-label="Comment" style="max-width:340px">${f.comment ? f.comment : `<span style="color:var(--muted)">—</span>`}</td>
-              <td data-label="Customer"><b style="font-size:13px">${f.customer || "Guest"}</b>${f.phone ? `<br><small style="color:var(--muted)">${f.phone}</small>` : ""}</td>
+              <td data-label="Comment" style="max-width:340px">${f.comment ? App.esc(f.comment) : `<span style="color:var(--muted)">—</span>`}</td>
+              <td data-label="Customer"><b style="font-size:13px">${App.esc(f.customer || "Guest")}</b>${f.phone ? `<br><small style="color:var(--muted)">${App.esc(f.phone)}</small>` : ""}</td>
               <td data-label="Order" class="oid">${f.orderCode || "—"}</td>
               <td data-label="Date" style="color:var(--muted);font-size:12.5px;white-space:nowrap">${formatDateTime(f.createdAt)}</td>
             </tr>`).join("")

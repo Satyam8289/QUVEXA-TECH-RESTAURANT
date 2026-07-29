@@ -6,6 +6,15 @@
 const App = (() => {
   const money = (n) => Api.money(n);
 
+  /* HTML-escape any user-controlled string before it goes into innerHTML.
+     Customer names, phones, feedback comments, vehicle numbers etc. are all
+     attacker-controlled and rendered into the owner's authenticated dashboard,
+     so without this a customer could store `<img src=x onerror=…>` as their
+     name and run script in the owner's session (account takeover). */
+  const esc = (v) => String(v == null ? "" : v)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
   /* ---- Inline SVG icon set (no emojis, no icon libs) ---- */
   const ICONS = {
     cart:    '<path d="M6 6h15l-1.5 9h-12L6 3H3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/>',
@@ -175,7 +184,7 @@ const App = (() => {
     return `${Math.floor(h / 24)} d ago`;
   };
 
-  return { money, icon, ICONS, imgFallback, toast, whatsappOrderLink, brandBar, brandMark, bottomNav,
+  return { money, esc, icon, ICONS, imgFallback, toast, whatsappOrderLink, brandBar, brandMark, bottomNav,
            getTableNo, setTableNo, isTableLocked, setTableLocked,
            getOrderType, setOrderType, clearOrderType, isDineIn, isTakeaway, needsVehicle, orderTypeLabel,
            getVehicle, setVehicle,

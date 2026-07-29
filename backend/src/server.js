@@ -17,15 +17,27 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.join(__dirname, "..", ".."); // backend/src -> backend -> project root
 
 const app = express();
-app.use(cors());                          // harmless to keep even same-origin; lets other origins call the API too
+app.disable("x-powered-by");              // don't advertise Express/version
+app.use(cors());
 app.use(express.json({ limit: "5mb" }));  // large limit for base64 logo uploads
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "foodhouse-api" }));
 app.use("/api", routes);
 app.use("/api/platform", adminRoutes);    // Super Admin — separate token scope, see auth.js
 
-// Static frontend (index.html, menu.html, dashboard.html, superadmin.html, css/, js/…)
-app.use(express.static(FRONTEND_DIR, { extensions: ["html"] }));
+// The frontend lives in the project root ALONGSIDE backend/ and .git, so
+// serving the root naively also exposed backend/src/*.js, package.json, etc.
+// Block anything that isn't customer-facing before it reaches express.static.
+const BLOCKED_PATH = /(^|\/)(backend|node_modules|deploy|\.git)(\/|$)/i;
+app.use((req, res, next) => {
+  if (BLOCKED_PATH.test(decodeURIComponent(req.path))) return res.status(404).json({ error: "Not found" });
+  next();
+});
+
+// Static frontend (index.html, menu.html, dashboard.html, superadmin.html, css/, js/…).
+// dotfiles:"deny" keeps .env and friends unreachable even if the guard above
+// is ever loosened.
+app.use(express.static(FRONTEND_DIR, { extensions: ["html"], dotfiles: "deny" }));
 
 // 404 + error handler (only reached if neither an API route nor a static file matched)
 app.use((req, res) => res.status(404).json({ error: "Not found" }));

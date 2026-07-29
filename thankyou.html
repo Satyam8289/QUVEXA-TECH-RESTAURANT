@@ -42,19 +42,20 @@
 
     async function main() {
       const code = localStorage.getItem("foodhouse-lastOrder");
+      const token = localStorage.getItem("foodhouse-lastOrderToken") || "";
       if (!code) { location.href = "index.html"; return; }
       try {
         await Api.loadPublic();
-        const order = await Api.getOrderByCode(code);
+        const order = await Api.getOrderByCode(code, token);
         document.getElementById("oid").textContent = order.code;
         document.getElementById("cust").textContent = order.customer || "there";
         document.getElementById("recap").innerHTML =
           order.items.map(it =>
             `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:14px">
-               <span>${it.qty} × ${it.name}</span><span>${App.money(it.price * it.qty)}</span></div>`).join("") +
+               <span>${it.qty} × ${App.esc(it.name)}</span><span>${App.money(it.price * it.qty)}</span></div>`).join("") +
           `<div style="display:flex;justify-content:space-between;padding-top:10px;margin-top:6px;border-top:1px dashed var(--line);font-weight:700">
-             <span>${order.orderType === "takeaway" ? `Takeaway${order.vehicleNumber ? ` · ${order.vehicleNumber}` : ""}` : `Table ${order.table ?? "—"}`} · ${order.method}</span><span>${App.money(order.total)}</span></div>`;
-        document.getElementById("billBtn").href = `bill.html?code=${encodeURIComponent(order.code)}&r=${Api.tenantSlug()}`;
+             <span>${order.orderType === "takeaway" ? `Takeaway${order.vehicleNumber ? ` · ${App.esc(order.vehicleNumber)}` : ""}` : `Table ${order.table ?? "—"}`} · ${order.method}</span><span>${App.money(order.total)}</span></div>`;
+        document.getElementById("billBtn").href = `bill.html?code=${encodeURIComponent(order.code)}&t=${encodeURIComponent(order.token || token)}&r=${Api.tenantSlug()}`;
       } catch (e) {
         location.href = "index.html";
       }

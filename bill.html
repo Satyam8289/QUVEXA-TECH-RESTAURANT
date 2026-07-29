@@ -59,10 +59,11 @@
     async function main() {
       const params = new URLSearchParams(location.search);
       const code = params.get("code");
+      const token = params.get("t") || localStorage.getItem("foodhouse-lastOrderToken") || "";
       if (!code) { location.href = "index.html"; return; }
       try {
         const data = await Api.loadPublic();
-        const order = await Api.getOrderByCode(code);
+        const order = await Api.getOrderByCode(code, token);
         document.getElementById("brand").innerHTML = App.brandBar({ back: "tracking.html", subtitle: "Bill / Receipt", orders: false });
 
         const gst = Math.round(order.total * 0.05 / 1.08); // approx breakdown for display only
@@ -78,13 +79,13 @@
               <span>${new Date(order.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>
             </div>
             <div class="bill-meta" style="margin-top:-10px">
-              <span>${order.orderType === "takeaway" ? `Takeaway${order.vehicleNumber ? ` · ${order.vehicleNumber}` : ""}` : `Table ${order.table ?? "—"}`} · ${order.customer || "Guest"}</span>
+              <span>${order.orderType === "takeaway" ? `Takeaway${order.vehicleNumber ? ` · ${App.esc(order.vehicleNumber)}` : ""}` : `Table ${order.table ?? "—"}`} · ${App.esc(order.customer || "Guest")}</span>
               <span>${order.method}</span>
             </div>
             <table class="bill-table">
               <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Amount</th></tr></thead>
               <tbody>
-                ${order.items.map(it => `<tr><td>${it.name}</td><td class="num">${it.qty}</td><td class="num">${App.money(it.price)}</td><td class="num">${App.money(it.price * it.qty)}</td></tr>`).join("")}
+                ${order.items.map(it => `<tr><td>${App.esc(it.name)}</td><td class="num">${it.qty}</td><td class="num">${App.money(it.price)}</td><td class="num">${App.money(it.price * it.qty)}</td></tr>`).join("")}
               </tbody>
             </table>
             <div class="bill-totals">

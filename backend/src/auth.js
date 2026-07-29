@@ -27,6 +27,30 @@ export function auth(req, res, next) {
 export const requireRole = (...roles) => (req, res, next) =>
   roles.includes(req.user.role) ? next() : res.status(403).json({ error: "You don't have access to this" });
 
+/* Tiny in-memory rate limiter — no external dependency. Enough to stop
+   password brute-forcing (the login routes were previously unlimited: a few
+   thousand guesses/second against a 4-char-minimum password). Keyed by client
+   IP + a label so login and platform-login count separately. Counters are
+   swept lazily as they expire; a single node process is all we run. */
+export function rateLimit({ windowMs, max, label }) {
+  const hits = new Map(); // key -> { count, resetAt }
+  return (req, res, next) => {
+    const now = Date.now();
+    const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
+    const key = `${label}:${ip}`;
+    let rec = hits.get(key);
+    if (!rec || rec.resetAt <= now) { rec = { count: 0, resetAt: now + windowMs }; hits.set(key, rec); }
+    rec.count += 1;
+    if (rec.count > max) {
+      const retry = Math.ceil((rec.resetAt - now) / 1000);
+      res.set("Retry-After", String(retry));
+      return res.status(429).json({ error: `Too many attempts. Try again in ${retry}s.` });
+    }
+    if (hits.size > 5000) for (const [k, v] of hits) if (v.resetAt <= now) hits.delete(k);
+    next();
+  };
+}
+
 /* ---- Platform (Super Admin) auth — entirely separate token scope from
    restaurant staff, so a tenant JWT can never be reused here or vice versa. ---- */
 export const signPlatformToken = (admin) =>

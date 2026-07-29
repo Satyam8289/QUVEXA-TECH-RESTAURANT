@@ -72,7 +72,7 @@
     function cardHTML(o) {
       const items = o.items.map((i) => `${i.qty}× ${i.name}`).join(" · ");
       return `
-      <a class="card" href="tracking.html?id=${encodeURIComponent(o.code)}" style="display:block;padding:16px">
+      <a class="card" href="tracking.html?id=${encodeURIComponent(o.code)}&t=${encodeURIComponent(o.token || "")}" style="display:block;padding:16px">
         <div style="display:flex;align-items:center;gap:10px">
           <div>
             <div style="font-family:var(--serif);font-size:17px;font-weight:600">${o.code}</div>

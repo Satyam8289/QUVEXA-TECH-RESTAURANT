@@ -73,9 +73,9 @@
         </tr></thead>
         <tbody>${list.map((c) => `
           <tr>
-            <td><input type="checkbox" class="rowChk" data-phone="${c.phone}" ${selected.has(c.phone) ? "checked" : ""}></td>
-            <td><b>${c.name || "Guest"}</b></td>
-            <td>${c.phone}</td>
+            <td><input type="checkbox" class="rowChk" data-phone="${App.esc(c.phone)}" ${selected.has(c.phone) ? "checked" : ""}></td>
+            <td><b>${App.esc(c.name || "Guest")}</b></td>
+            <td>${App.esc(c.phone)}</td>
             <td>${c.orderCount}</td>
             <td style="font-weight:700">${App.money(c.totalSpent)}</td>
             <td style="color:var(--muted)">${App.timeAgo(c.lastVisit)}</td>

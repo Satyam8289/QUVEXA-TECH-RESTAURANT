@@ -139,6 +139,12 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_charge NUMERIC(10,2) NOT NUL
 -- at all and carries the customer's vehicle number instead.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_type TEXT NOT NULL DEFAULT 'dine-in';
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS vehicle_number TEXT;
+-- An unguessable token for the customer-facing order URL. Order codes are
+-- sequential (ORD-2041, 2042…) so anyone could otherwise walk them and read
+-- every customer's name/phone/items. The public track/bill endpoints require
+-- this token; staff reach orders through the authenticated API instead.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS public_token TEXT;
+UPDATE orders SET public_token = encode(gen_random_bytes(9), 'hex') WHERE public_token IS NULL;
 
 -- Private feedback: only the restaurant ever sees this. Asking here rather
 -- than on a public review site is the point — the owner hears about a bad

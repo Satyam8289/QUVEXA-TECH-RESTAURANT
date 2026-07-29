@@ -99,7 +99,9 @@ const Api = (() => {
   const getCategoriesPublic = () => cache.categories;
 
   const placeOrderPublic = (payload) => req(`/public/${tenantSlug()}/orders`, { method: "POST", body: payload });
-  const getOrderByCode = (code) => req(`/public/${tenantSlug()}/orders/${encodeURIComponent(code)}`);
+  // The token gates access — order codes are guessable, the token isn't.
+  const getOrderByCode = (code, token) =>
+    req(`/public/${tenantSlug()}/orders/${encodeURIComponent(code)}?t=${encodeURIComponent(token || "")}`);
   const myOrders = (phone) => req(`/public/${tenantSlug()}/orders?phone=${encodeURIComponent(phone)}`);
 
   /* Loyalty preview + private feedback (customer side). */

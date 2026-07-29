@@ -4,7 +4,7 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 import { q, tx } from "./db.js";
-import { auth, requireRole, hashPassword, verifyPassword, signToken } from "./auth.js";
+import { auth, requireRole, rateLimit, hashPassword, verifyPassword, signToken } from "./auth.js";
 import { uploadDataUrlToR2, r2Configured } from "./r2.js";
 
 const r = Router();
@@ -22,6 +22,7 @@ const ORDERS_SELECT = `
          o.method, o.status, o.total::float AS total, o.discount::float AS discount,
          o.tax::float AS tax, o.service_charge::float AS "serviceCharge", o.created_at AS "createdAt",
          o.payment_collected AS "paymentCollected", o.collected_by AS "collectedBy", o.collected_at AS "collectedAt",
+         o.public_token AS token,
          COALESCE(json_agg(json_build_object(
            'id', oi.menu_item_id, 'name', oi.name, 'price', oi.price::float,
            'qty', oi.qty, 'note', oi.note) ORDER BY oi.id)
@@ -67,8 +68,32 @@ async function orderCountForPhone(client, tenantId, phone) {
 const GST_RATE = 0.05;
 const SERVICE_RATE = 0.03;
 
+/* Resolve a client-submitted cart into authoritative line items. The browser
+   is trusted for WHAT was ordered (item id + quantity) but NEVER for the
+   price or name — those are read from this tenant's own menu, so a customer
+   can't hand-edit the request to buy a ₹500 dish for ₹1, invent free items,
+   or send negative quantities. */
+async function resolveItems(client, tenantId, rawItems) {
+  const ids = [...new Set(rawItems.map((it) => it.id).filter(Boolean))];
+  if (!ids.length) throw Object.assign(new Error("Order has no valid items"), { status: 400 });
+  const { rows } = await client.query(
+    "SELECT id, name, price::float AS price FROM menu_items WHERE tenant_id=$1 AND id = ANY($2)",
+    [tenantId, ids]
+  );
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const resolved = [];
+  for (const it of rawItems) {
+    const dish = byId.get(it.id);
+    if (!dish) throw Object.assign(new Error("That item isn't on the menu"), { status: 400 });
+    const qty = Math.floor(Number(it.qty));
+    if (!Number.isFinite(qty) || qty < 1 || qty > 99) throw Object.assign(new Error("Invalid quantity"), { status: 400 });
+    resolved.push({ id: dish.id, name: dish.name, price: dish.price, qty, note: String(it.note || "").slice(0, 200) });
+  }
+  return resolved;
+}
+
 async function priceOrder(client, tenant, items, phone) {
-  const subtotal = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
+  const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
   const tax = Math.round(subtotal * GST_RATE);
   const serviceCharge = Math.round(subtotal * SERVICE_RATE);
   const discount = await loyaltyDiscount(client, tenant, phone, subtotal);
@@ -89,8 +114,12 @@ export async function loyaltyDiscount(client, tenant, phone, subtotal) {
 }
 
 async function createOrder(client, tenantId, body) {
-  const items = Array.isArray(body.items) ? body.items : [];
-  if (!items.length) throw Object.assign(new Error("Order has no items"), { status: 400 });
+  const rawItems = Array.isArray(body.items) ? body.items : [];
+  if (!rawItems.length) throw Object.assign(new Error("Order has no items"), { status: 400 });
+  // Prices/names come from the DB, not the request — see resolveItems.
+  const items = await resolveItems(client, tenantId, rawItems);
+  const customerName = String(body.customer || "Guest").slice(0, 120);
+  const phone = String(body.phone || "").slice(0, 20);
 
   // Only dine-in uses a table. Takeaway (which covers car service) is picked
   // up instead, so it carries the customer's vehicle number and must be paid
@@ -101,7 +130,7 @@ async function createOrder(client, tenantId, body) {
     throw Object.assign(new Error("Please enter your vehicle number"), { status: 400 });
   const table = orderType === "dine-in" ? (body.table ? Number(body.table) : null) : null;
   const tenant = (await client.query("SELECT * FROM tenants WHERE id=$1", [tenantId])).rows[0];
-  const { tax, serviceCharge, discount, total } = await priceOrder(client, tenant, items, body.phone);
+  const { tax, serviceCharge, discount, total } = await priceOrder(client, tenant, items, phone);
   const code = await nextOrderCode(client, tenantId);
   const method = body.method || "Cash";
   // Cash needs someone to physically collect it; every other method (Card/UPI,
@@ -111,33 +140,30 @@ async function createOrder(client, tenantId, body) {
   // Every order belongs to the tenant's current active session (financial
   // year) — this is how each year's orders/payments/analytics stay separate.
   const sessionId = await getActiveSessionId(client, tenantId);
+  const publicToken = crypto.randomBytes(9).toString("hex");
   const order = (await client.query(
     `INSERT INTO orders (tenant_id, session_id, code, table_number, customer_name, phone, method, status,
-                         total, tax, service_charge, discount, payment_collected, order_type, vehicle_number)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,$11,$12,$13,$14) RETURNING id, code`,
-    [tenantId, sessionId, code, table, body.customer || "Guest", body.phone || "", method, total, tax,
-     serviceCharge, discount, paymentCollected, orderType, vehicleNumber]
+                         total, tax, service_charge, discount, payment_collected, order_type, vehicle_number, public_token)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id, code, public_token AS token`,
+    [tenantId, sessionId, code, table, customerName, phone, method, total, tax,
+     serviceCharge, discount, paymentCollected, orderType, vehicleNumber, publicToken]
   )).rows[0];
   for (const it of items) {
     await client.query(
       `INSERT INTO order_items (order_id, menu_item_id, name, price, qty, note) VALUES ($1,$2,$3,$4,$5,$6)`,
-      [order.id, it.id || null, it.name, it.price, it.qty, it.note || null]
+      [order.id, it.id, it.name, it.price, it.qty, it.note || null]
     );
-    // Never let stock go negative — a race between two customers ordering the
-    // last few portions at once just clamps at 0 rather than erroring out.
     // A combo has no stock of its own; it draws down the dishes it bundles.
-    if (it.id) {
-      const qty = Number(it.qty) || 0;
-      const parts = (await client.query("SELECT menu_item_id, qty FROM combo_items WHERE combo_id=$1", [it.id])).rows;
-      const toDeduct = parts.length
-        ? parts.map((p) => ({ id: p.menu_item_id, qty: p.qty * qty }))
-        : [{ id: it.id, qty }];
-      for (const d of toDeduct) {
-        await client.query(
-          `UPDATE menu_items SET stock = GREATEST(0, stock - $1) WHERE id=$2 AND tenant_id=$3`,
-          [d.qty, d.id, tenantId]
-        );
-      }
+    const parts = (await client.query("SELECT menu_item_id, qty FROM combo_items WHERE combo_id=$1", [it.id])).rows;
+    const toDeduct = parts.length
+      ? parts.map((p) => ({ id: p.menu_item_id, qty: p.qty * it.qty }))
+      : [{ id: it.id, qty: it.qty }];
+    for (const d of toDeduct) {
+      // Clamp at 0 so a burst of simultaneous orders can't drive stock negative.
+      await client.query(
+        `UPDATE menu_items SET stock = GREATEST(0, stock - $1) WHERE id=$2 AND tenant_id=$3`,
+        [d.qty, d.id, tenantId]
+      );
     }
   }
   if (table) await client.query("UPDATE restaurant_tables SET status='occupied' WHERE tenant_id=$1 AND number=$2", [tenantId, table]);
@@ -156,7 +182,8 @@ const publicTenant = (t) => ({
 });
 
 /* ==================== AUTH ==================== */
-r.post("/auth/login", h(async (req, res) => {
+const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, label: "login" });
+r.post("/auth/login", loginLimiter, h(async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: "Enter username and password" });
   const { rows } = await q("SELECT * FROM users WHERE lower(username)=lower($1) AND active", [String(username).trim()]);
@@ -550,7 +577,16 @@ r.get("/stats", auth, h(async (req, res) => {
   // Occupied tables is always the CURRENT live floor status, regardless of
   // which session is being viewed — a past year's tables aren't "occupied" now.
   const occ = (await q("SELECT COUNT(*)::int AS occupied, (SELECT COUNT(*)::int FROM restaurant_tables WHERE tenant_id=$1) AS total FROM restaurant_tables WHERE tenant_id=$1 AND status='occupied'", [t])).rows[0];
-  res.json({ revenue: rev.revenue, count: rev.count, avg: rev.count ? Math.round(rev.revenue / rev.count) : 0, occupied: occ.occupied, tables: occ.total });
+  // Waiters must never see money figures — the frontend hides them, but that's
+  // cosmetic; a waiter calling this endpoint directly would otherwise get the
+  // day's revenue. Strip it here so the rule is actually enforced server-side.
+  const canSeeMoney = req.user.role === "owner" || req.user.role === "manager";
+  res.json({
+    revenue: canSeeMoney ? rev.revenue : null,
+    count: rev.count,
+    avg: canSeeMoney && rev.count ? Math.round(rev.revenue / rev.count) : null,
+    occupied: occ.occupied, tables: occ.total,
+  });
 }));
 
 /* ==================== PUBLIC (customer) ==================== */
@@ -594,9 +630,16 @@ r.post("/public/:slug/orders", h(loadTenant), h(async (req, res) => {
 }));
 
 r.get("/public/:slug/orders/:code", h(loadTenant), h(async (req, res) => {
+  // Order codes are sequential and therefore guessable, so knowing the code
+  // is NOT enough — the caller must also present the order's unguessable
+  // token (returned when the order was placed, and stored on that device).
+  const token = String(req.query.t || "");
   const { rows } = await q(`${ORDERS_SELECT} WHERE o.tenant_id=$1 AND o.code=$2 GROUP BY o.id`, [req.tenant.id, req.params.code]);
-  if (!rows[0]) return res.status(404).json({ error: "Order not found" });
-  res.json(rows[0]);
+  const order = rows[0];
+  // Constant-ish check: reveal the same 404 whether the code or the token is
+  // wrong, so an attacker can't tell a real code from a fake one.
+  if (!order || !order.token || token !== order.token) return res.status(404).json({ error: "Order not found" });
+  res.json(order);
 }));
 
 /* Tells the checkout page whether this customer's next order earns a loyalty
@@ -641,10 +684,12 @@ r.post("/public/:slug/feedback", h(loadTenant), h(async (req, res) => {
 r.post("/public/:slug/razorpay/order", h(loadTenant), h(async (req, res) => {
   const { razorpay_key_id: keyId, razorpay_key_secret: keySecret } = req.tenant;
   if (!keyId || !keySecret) return res.status(400).json({ error: "Online payments aren't set up for this restaurant yet" });
-  const items = Array.isArray(req.body?.items) ? req.body.items : [];
-  if (!items.length) return res.status(400).json({ error: "Your cart is empty" });
-  // Charge exactly what createOrder will record as the order total — same
-  // helper, so tax, service charge and any loyalty discount all line up.
+  const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
+  if (!rawItems.length) return res.status(400).json({ error: "Your cart is empty" });
+  // Resolve prices from the DB (never trust the browser) and charge exactly
+  // what createOrder will record as the order total — same helpers, so the
+  // Razorpay amount, the stored total and the displayed total always agree.
+  const items = await resolveItems({ query: q }, req.tenant.id, rawItems);
   const { total } = await priceOrder({ query: q }, req.tenant, items, req.body?.phone);
   const amountPaise = Math.round(total * 100);
   if (amountPaise < 100) return res.status(400).json({ error: "Order amount is too small to pay online" });

@@ -211,6 +211,7 @@
                   orderType: ORDER_TYPE, vehicleNumber: vehicle,
                 });
                 localStorage.setItem("foodhouse-lastOrder", order.code);
+                localStorage.setItem("foodhouse-lastOrderToken", order.token || "");
                 Cart.clear();
                 location.href = "thankyou.html";
               } catch (ex) {
@@ -240,6 +241,7 @@
       try {
         const order = await Api.placeOrderPublic({ table: Number(table), customer: name, phone, method: orderMethod, items, orderType: "dine-in" });
         localStorage.setItem("foodhouse-lastOrder", order.code);
+                localStorage.setItem("foodhouse-lastOrderToken", order.token || "");
         Cart.clear();
         location.href = "thankyou.html";
       } catch (ex) {

@@ -4,7 +4,7 @@
    JWT scope), never a tenant-scoped staff token. */
 import { Router } from "express";
 import { q, tx } from "./db.js";
-import { platformAuth, hashPassword, verifyPassword, signPlatformToken } from "./auth.js";
+import { platformAuth, rateLimit, hashPassword, verifyPassword, signPlatformToken } from "./auth.js";
 
 const r = Router();
 const h = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -30,7 +30,8 @@ function fyName(date = new Date()) {
 }
 
 /* ==================== AUTH ==================== */
-r.post("/login", h(async (req, res) => {
+const platformLoginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, label: "platform-login" });
+r.post("/login", platformLoginLimiter, h(async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: "Enter username and password" });
   const admin = (await q("SELECT * FROM platform_admins WHERE lower(username)=lower($1)", [String(username).trim()])).rows[0];

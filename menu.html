@@ -43,88 +43,17 @@
     <div class="ot-inner">
       <span class="ot-mark" id="otMark"></span>
       <h2>How are you ordering?</h2>
-      <p>Tap one to start your order</p>
+      <p id="otHint">Tap one to start your order</p>
       <div class="ot-grid">
-        <button type="button" class="ot-box ot-dine" data-type="dine-in">
-          <span class="ot-badge">
-            <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M7 3v6a2.5 2.5 0 0 0 5 0V3M9.5 11v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              <path d="M17.5 3c-1.3 1-1.9 2.9-1.9 5 0 1.4.8 2.3 1.9 2.5V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <b>Dine In</b>
-          <span class="ot-rule"><i></i><span>◆</span><i></i></span>
-          <small id="otDineSub">Served at your table</small>
-
-          <svg class="ot-art" viewBox="0 0 200 132" aria-hidden="true">
-            <ellipse cx="100" cy="122" rx="82" ry="8" fill="#0f5132" opacity=".06"/>
-            <!-- left chair: upholstered back, seat, brass legs -->
-            <path d="M30 60c0-7 5-11 12-11s12 4 12 11v22H30Z" fill="#125a37"/>
-            <rect x="27" y="79" width="30" height="9" rx="4.5" fill="#0f5132"/>
-            <path d="M31 88l-4 26M53 88l4 26" stroke="#c9a24a" stroke-width="3" stroke-linecap="round"/>
-            <!-- right chair -->
-            <path d="M146 60c0-7 5-11 12-11s12 4 12 11v22h-24Z" fill="#125a37"/>
-            <rect x="143" y="79" width="30" height="9" rx="4.5" fill="#0f5132"/>
-            <path d="M147 88l-4 26M169 88l4 26" stroke="#c9a24a" stroke-width="3" stroke-linecap="round"/>
-            <!-- round marble table -->
-            <ellipse cx="100" cy="72" rx="46" ry="12" fill="#fff" stroke="#dfe6e0" stroke-width="1.5"/>
-            <path d="M54 72c0 6.6 20.6 12 46 12s46-5.4 46-12v5c0 6.6-20.6 12-46 12s-46-5.4-46-12Z" fill="#eef1ec"/>
-            <rect x="90" y="84" width="20" height="28" rx="3" fill="#12482f"/>
-            <ellipse cx="100" cy="114" rx="24" ry="6" fill="#c9a24a"/>
-            <!-- plate stack -->
-            <ellipse cx="72" cy="70" rx="15" ry="4.4" fill="#fff" stroke="#d7ddd6" stroke-width="1.3"/>
-            <ellipse cx="72" cy="67" rx="12" ry="3.4" fill="#fff" stroke="#d7ddd6" stroke-width="1.3"/>
-            <!-- brass vase with leaves -->
-            <path d="M96 66h9l-1.6 -12h-5.8Z" fill="#c9a24a"/>
-            <path d="M100.5 54c0-9 4-14 9-16-1 7-4 12-9 16Zm0 0c0-7-3.5-11-8-13 1 6 3.5 10 8 13Z" fill="#3f8f5c"/>
-            <path d="M100.5 54V40" stroke="#3f8f5c" stroke-width="1.6" stroke-linecap="round"/>
-            <!-- glass -->
-            <path d="M118 56h11l-1.4 13.5h-8.2Z" fill="#bcd9c8" opacity=".85" stroke="#8fbfa4" stroke-width="1.2" stroke-linejoin="round"/>
-          </svg>
-
-          <span class="ot-go"></span>
+        <!-- Each tile is a single artwork (title, caption and arrow are part of
+             the image), hosted on R2 like every other uploaded image. -->
+        <button type="button" class="ot-box" data-type="dine-in" aria-label="Dine in — served at your table">
+          <img src="https://pub-84b7e9564cf7471e87c7bd28b1855b7d.r2.dev/2f764f3c-71c5-41aa-b8d3-4c05e2ef7601/ordertype/d81256c1-c9dd-44b4-8598-6fa54dca4388.jpg" alt="Dine in — served at your table" />
         </button>
-
-        <button type="button" class="ot-box ot-take" data-type="takeaway" id="otTakeaway">
-          <span class="ot-badge">
-            <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M5.5 8h13l-1 12.5a1.6 1.6 0 0 1-1.6 1.5H8.1a1.6 1.6 0 0 1-1.6-1.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-              <path d="M8.6 8V6a3.4 3.4 0 0 1 6.8 0v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              <path d="M10 13l4 4M14 13l-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-            </svg>
-          </span>
-          <b>Takeaway /<br>Car Service</b>
-          <span class="ot-rule"><i></i><span>◆</span><i></i></span>
-          <small id="otTakeawaySub">Brought out to your car</small>
-
-          <svg class="ot-art" viewBox="0 0 200 132" aria-hidden="true">
-            <ellipse cx="100" cy="120" rx="80" ry="8" fill="#7c2d12" opacity=".07"/>
-            <!-- kraft bag riding on the roof -->
-            <path d="M84 30h32l-2.5 26H86.5Z" fill="#e8d6bd" stroke="#c9a887" stroke-width="1.6" stroke-linejoin="round"/>
-            <path d="M92 30v-4a8 8 0 0 1 16 0v4" fill="none" stroke="#c9a887" stroke-width="2.2" stroke-linecap="round"/>
-            <path d="M96 38v9M104 38v9M96 42.5h8" stroke="var(--orange-600)" stroke-width="2" stroke-linecap="round"/>
-            <!-- car body -->
-            <path d="M26 96V78c0-4 3-7 7-7h9l12-14c2-2.4 4.6-3.6 7.6-3.6h47c3.6 0 6.6 1.6 8.8 4.4l10 13.2h13c4 0 7 3 7 7v18Z"
-                  fill="var(--orange)" stroke="#b34a06" stroke-width="2"/>
-            <!-- windows -->
-            <path d="M60 71l9.5-11c1.2-1.4 2.6-2 4.4-2H92v13Z" fill="#cfe6d8" opacity=".9"/>
-            <path d="M99 58h20c2 0 3.6.8 5 2.4L132 71H99Z" fill="#cfe6d8" opacity=".9"/>
-            <!-- trim + lights -->
-            <rect x="26" y="80" width="12" height="6" rx="3" fill="#fff"/>
-            <rect x="158" y="80" width="12" height="6" rx="3" fill="#fff8f2"/>
-            <rect x="70" y="82" width="58" height="3" rx="1.5" fill="#b34a06" opacity=".35"/>
-            <!-- number plate -->
-            <rect x="30" y="88" width="22" height="8" rx="2" fill="#fff" stroke="#d9d2c8" stroke-width="1"/>
-            <!-- wheels with alloys -->
-            <circle cx="62" cy="96" r="15" fill="#23282a"/>
-            <circle cx="62" cy="96" r="7" fill="#cdd5d0"/>
-            <circle cx="62" cy="96" r="2.6" fill="#8b9691"/>
-            <circle cx="140" cy="96" r="15" fill="#23282a"/>
-            <circle cx="140" cy="96" r="7" fill="#cdd5d0"/>
-            <circle cx="140" cy="96" r="2.6" fill="#8b9691"/>
-          </svg>
-
-          <span class="ot-go"></span>
+        <button type="button" class="ot-box" data-type="takeaway" id="otTakeaway"
+                aria-label="Takeaway or car service — brought out to your car">
+          <img src="https://pub-84b7e9564cf7471e87c7bd28b1855b7d.r2.dev/2f764f3c-71c5-41aa-b8d3-4c05e2ef7601/ordertype/d7b72198-3fa5-4a45-a887-95296c877c62.jpg" alt="Takeaway or car service — brought out to your car" />
+          <span class="ot-na" id="otTakeawayNA" hidden>Not available yet</span>
         </button>
       </div>
     </div>
@@ -272,17 +201,20 @@
       if (App.getOrderType()) return;              // already chosen this visit
       const overlay = document.getElementById("otOverlay");
       document.getElementById("otMark").innerHTML = App.brandMark(54);
-      overlay.querySelectorAll(".ot-go").forEach((g) => { g.innerHTML = App.icon("back", 18); });
 
+      // The tile artwork says "served at your table" generically, so the
+      // actual table number goes in the header instead of on the card.
       const tableNo = App.getTableNo();
-      if (App.isTableLocked() && tableNo) document.getElementById("otDineSub").textContent = `Served at table ${tableNo}`;
+      if (App.isTableLocked() && tableNo) {
+        document.getElementById("otHint").textContent = `You're at table ${tableNo} · tap one to start your order`;
+      }
 
       // Takeaway is prepaid, so it's only offered once the restaurant has
       // connected Razorpay — otherwise there's no way to pay for it.
       const canPrepay = !!tenant.razorpayEnabled;
       if (!canPrepay) {
         document.getElementById("otTakeaway").classList.add("disabled");
-        document.getElementById("otTakeawaySub").textContent = "Not available here yet";
+        document.getElementById("otTakeawayNA").hidden = false;
       }
 
       overlay.classList.add("open");

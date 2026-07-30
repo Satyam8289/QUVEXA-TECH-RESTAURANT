@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import { q, tx } from "./db.js";
 import { auth, requireRole, rateLimit, hashPassword, verifyPassword, signToken } from "./auth.js";
 import { uploadDataUrlToR2, r2Configured } from "./r2.js";
+import { sendOrderWhatsApp, whatsappConfigured } from "./whatsapp.js";
 
 const r = Router();
 const h = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -343,6 +344,16 @@ r.patch("/orders/:id", auth, h(async (req, res) => {
   if (!["pending", "preparing", "ready", "served"].includes(status)) return res.status(400).json({ error: "Bad status" });
   await q("UPDATE orders SET status=$1 WHERE id=$2 AND tenant_id=$3", [status, req.params.id, req.user.tid]);
   res.json({ ok: true });
+
+  // WhatsApp confirmation, if this restaurant has turned it on — fired after
+  // responding, so a slow/failed WhatsApp call never delays the status update.
+  if (status === "served") {
+    const tenant = (await q("SELECT * FROM tenants WHERE id=$1", [req.user.tid])).rows[0];
+    if (whatsappConfigured(tenant)) {
+      const order = (await q("SELECT code, phone, total::float AS total FROM orders WHERE id=$1", [req.params.id])).rows[0];
+      if (order) sendOrderWhatsApp(tenant, order);
+    }
+  }
 }));
 
 /* Mark a (usually Cash) order's payment as physically collected — records
@@ -528,6 +539,11 @@ r.get("/settings", auth, h(async (req, res) => {
     ...publicTenant(t),
     razorpayKeyId: t.razorpay_key_id || "",
     razorpayConnected: !!(t.razorpay_key_id && t.razorpay_key_secret),
+    whatsappEnabled: t.whatsapp_enabled,
+    whatsappPhoneNumberId: t.whatsapp_phone_number_id || "",
+    whatsappTemplateName: t.whatsapp_template_name || "order_confirmation",
+    whatsappTemplateLang: t.whatsapp_template_lang || "en_US",
+    whatsappConnected: !!(t.whatsapp_phone_number_id && t.whatsapp_access_token),
   });
 }));
 
@@ -553,6 +569,15 @@ r.put("/settings", auth, requireRole("owner", "manager"), h(async (req, res) => 
     // here means "leave the stored secret unchanged" — only overwrite it
     // when the owner actually typed a new one.
     if (b.razorpayKeySecret) set("razorpay_key_secret", String(b.razorpayKeySecret).trim());
+
+    // WhatsApp order-confirmation — optional per restaurant, owner-only since
+    // it carries the same access-token sensitivity as the Razorpay secret.
+    set("whatsapp_enabled", b.whatsappEnabled);
+    if (b.whatsappPhoneNumberId !== undefined) set("whatsapp_phone_number_id", String(b.whatsappPhoneNumberId).trim() || null);
+    if (b.whatsappTemplateName !== undefined) set("whatsapp_template_name", String(b.whatsappTemplateName).trim() || "order_confirmation");
+    if (b.whatsappTemplateLang !== undefined) set("whatsapp_template_lang", String(b.whatsappTemplateLang).trim() || "en_US");
+    // Same "blank = unchanged" pattern as the Razorpay secret.
+    if (b.whatsappAccessToken) set("whatsapp_access_token", String(b.whatsappAccessToken).trim());
   }
   if (!fields.length) return res.json({ ok: true });
   vals.push(req.user.tid);

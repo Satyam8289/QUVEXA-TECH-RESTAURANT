@@ -28,6 +28,15 @@ ALTER TABLE tenants ADD COLUMN IF NOT EXISTS loyalty_percent INT NOT NULL DEFAUL
 -- Where to send happy customers to leave a public review (we can never post
 -- on their behalf — Google forbids it — so this is just a link they tap).
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS google_review_url TEXT;
+-- WhatsApp order-confirmation (Meta Cloud API, "Utility" message category).
+-- Requires the restaurant's own Meta WhatsApp Business Platform number and a
+-- pre-approved template — we never touch WhatsApp's servers except via their
+-- official Graph API using the tenant's own credentials.
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_phone_number_id TEXT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_access_token TEXT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_template_name TEXT DEFAULT 'order_confirmation';
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_template_lang TEXT DEFAULT 'en_US';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_custom_domain ON tenants(custom_domain) WHERE custom_domain IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS users (

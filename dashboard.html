@@ -656,6 +656,23 @@
                 ` : `<p style="font-size:13px;color:var(--muted)">${s.razorpayConnected ? "Razorpay is connected." : "Not connected yet — ask the owner to add API keys."} (owner only)</p>`}
               </div>
               <div class="panel card">
+                <div class="panel-head"><h3>WhatsApp order confirmation</h3>${s.whatsappConnected ? `<span class="badge ready">Connected</span>` : ""}</div>
+                <p class="settings-hint" style="margin:0 0 12px">Optional — send an automatic WhatsApp message when an order is marked <b>Served</b>. Uses Meta's official WhatsApp Business Platform (your own number, your own approved template), never a third-party or unofficial tool.</p>
+                ${role === "owner" ? `
+                  <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+                    <label class="switch"><input type="checkbox" id="waToggle" ${s.whatsappEnabled ? "checked" : ""}><span class="slider"></span></label>
+                    <p class="settings-hint" style="margin:0">Turn on to send the confirmation automatically. Off by default — nothing sends unless you enable it here.</p>
+                  </div>
+                  <div class="field"><label>Phone Number ID</label><input class="input" id="waPhoneId" placeholder="from Meta Business → WhatsApp → API Setup" value="${s.whatsappPhoneNumberId || ""}"></div>
+                  <div class="field"><label>Access Token</label><input class="input" type="password" id="waToken" placeholder="${s.whatsappConnected ? "•••••••••••• (unchanged — type to replace)" : "Enter access token"}"></div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="field" style="margin-bottom:0"><label>Template name</label><input class="input" id="waTemplate" value="${s.whatsappTemplateName || "order_confirmation"}"></div>
+                    <div class="field" style="margin-bottom:0"><label>Template language</label><input class="input" id="waLang" value="${s.whatsappTemplateLang || "en_US"}"></div>
+                  </div>
+                  <p class="settings-hint" style="margin-top:10px">The template must already be approved in your Meta Business Manager, with two body variables: order code and total (e.g. "Your order {{1}} is served! Total: {{2}}. Thank you!").</p>
+                ` : `<p style="font-size:13px;color:var(--muted)">${s.whatsappConnected ? `WhatsApp confirmation is ${s.whatsappEnabled ? "on" : "off"}.` : "Not connected yet — ask the owner to set it up."} (owner only)</p>`}
+              </div>
+              <div class="panel card">
                 <div class="panel-head"><h3>Loyalty rewards</h3>${s.loyaltyEnabled ? `<span class="badge ready">On</span>` : ""}</div>
                 <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
                   <label class="switch"><input type="checkbox" id="loyaltyToggle" ${s.loyaltyEnabled ? "checked" : ""}><span class="slider"></span></label>
@@ -736,6 +753,16 @@
         if (rzpKeyIdInput) patch.razorpayKeyId = rzpKeyIdInput.value.trim();
         const rzpSecretInput = document.getElementById("setRzpKeySecret");
         if (rzpSecretInput && rzpSecretInput.value.trim()) patch.razorpayKeySecret = rzpSecretInput.value.trim();
+        const waToggle = document.getElementById("waToggle");
+        if (waToggle) patch.whatsappEnabled = waToggle.checked;
+        const waPhoneId = document.getElementById("waPhoneId");
+        if (waPhoneId) patch.whatsappPhoneNumberId = waPhoneId.value.trim();
+        const waTemplate = document.getElementById("waTemplate");
+        if (waTemplate) patch.whatsappTemplateName = waTemplate.value.trim();
+        const waLang = document.getElementById("waLang");
+        if (waLang) patch.whatsappTemplateLang = waLang.value.trim();
+        const waToken = document.getElementById("waToken");
+        if (waToken && waToken.value.trim()) patch.whatsappAccessToken = waToken.value.trim();
         if (pendingLogo !== null) {
           // Upload to Cloudflare R2 so the logo isn't stored inline as a huge
           // base64 blob in Postgres; falls back to the old inline storage if

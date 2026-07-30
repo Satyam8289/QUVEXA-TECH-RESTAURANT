@@ -56,6 +56,11 @@
   <script src="js/cart.js"></script>
   <script src="js/app.js"></script>
   <script>
+    // Backend + Settings wiring for this is fully built and working (tested
+    // end-to-end) — just hidden from the UI for now. Flip to true to bring
+    // the "WhatsApp order confirmation" panel back in Settings.
+    const SHOW_WHATSAPP_SETTINGS = false;
+
     const view = document.getElementById("view");
     const STATUSES = ["pending", "preparing", "ready", "served"];
     const catName = (id) => (CATS.find((c) => c.slug === id) || {}).name || id;
@@ -655,6 +660,7 @@
                   <div class="field" style="margin-bottom:0"><label>Key Secret</label><input class="input" type="password" id="setRzpKeySecret" placeholder="${s.razorpayConnected ? "•••••••••••• (unchanged — type to replace)" : "Enter key secret"}"></div>
                 ` : `<p style="font-size:13px;color:var(--muted)">${s.razorpayConnected ? "Razorpay is connected." : "Not connected yet — ask the owner to add API keys."} (owner only)</p>`}
               </div>
+              ${SHOW_WHATSAPP_SETTINGS ? `
               <div class="panel card">
                 <div class="panel-head"><h3>WhatsApp order confirmation</h3>${s.whatsappConnected ? `<span class="badge ready">Connected</span>` : ""}</div>
                 <p class="settings-hint" style="margin:0 0 12px">Optional — send an automatic WhatsApp message when an order is marked <b>Served</b>. Uses Meta's official WhatsApp Business Platform (your own number, your own approved template), never a third-party or unofficial tool.</p>
@@ -672,6 +678,7 @@
                   <p class="settings-hint" style="margin-top:10px">The template must already be approved in your Meta Business Manager, with two body variables: order code and total (e.g. "Your order {{1}} is served! Total: {{2}}. Thank you!").</p>
                 ` : `<p style="font-size:13px;color:var(--muted)">${s.whatsappConnected ? `WhatsApp confirmation is ${s.whatsappEnabled ? "on" : "off"}.` : "Not connected yet — ask the owner to set it up."} (owner only)</p>`}
               </div>
+              ` : ""}
               <div class="panel card">
                 <div class="panel-head"><h3>Loyalty rewards</h3>${s.loyaltyEnabled ? `<span class="badge ready">On</span>` : ""}</div>
                 <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">

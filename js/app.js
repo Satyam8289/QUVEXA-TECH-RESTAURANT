@@ -223,7 +223,6 @@ App.NAV = [
   { key: "stock",     label: "Stock",        icon: "box",       roles: ["owner", "manager"] },
   { key: "staff",     label: "Staff",        icon: "users",     roles: ["owner"] },
   { key: "analytics", label: "Analytics",    icon: "trend",     roles: ["owner", "manager"] },
-  { key: "feedback",  label: "Feedback",     icon: "star",      roles: ["owner", "manager"] },
   { key: "messages",  label: "Send Message", icon: "message",   roles: ["owner", "manager"], href: "messages.html" },
   { key: "settings",  label: "Settings",     icon: "gear",      roles: ["owner"] },
 ];

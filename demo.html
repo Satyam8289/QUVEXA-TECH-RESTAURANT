@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Try the Demo — Quvexa Restro</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f5132'/%3E%3Cpath d='M4 18c8 2 15-4 15-13 0 0-13-3-15 8' fill='%23fff'/%3E%3C/svg%3E" />
+</head>
+<body class="customer">
+  <div class="phone">
+    <div class="section" style="padding-top:28px;text-align:center">
+      <span class="brand-mark" style="width:52px;height:52px;margin:0 auto 14px"></span>
+    </div>
+    <div id="content"></div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/qrcode.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    // A dedicated, safe sandbox account — real menu, zero real orders/customers,
+    // never exposed anywhere except after a visitor identifies themselves here.
+    const DEMO_SLUG = "quvexa-demo";
+    const content = document.getElementById("content");
+
+    document.querySelector(".brand-mark").innerHTML = App.icon("leaf", 26);
+
+    function renderForm() {
+      content.innerHTML = `
+        <div class="section" style="padding-top:0;text-align:center">
+          <h1 style="font-family:var(--serif);font-size:26px;font-weight:600">See Quvexa Restro live</h1>
+          <p style="color:var(--muted);font-size:14px;margin-top:6px">Tell us a bit about your business and we'll open the demo dashboard for you — real menu, sandbox data, nothing real to break.</p>
+        </div>
+        <form class="section" style="padding-top:6px" id="leadForm">
+          <div class="card" style="padding:20px">
+            <div class="field"><label for="bizName">Business name</label><input class="input" id="bizName" required placeholder="e.g. Sharma Dhaba" /></div>
+            <div class="field" style="margin-bottom:0"><label for="bizPhone">Phone number</label><input class="input" id="bizPhone" type="tel" required inputmode="tel" placeholder="+91 98765 43210" /></div>
+          </div>
+          <p style="text-align:center;color:var(--muted);font-size:11.5px;margin-top:10px">We'll only use this to follow up about Quvexa Restro — never shared, never spammed.</p>
+          <button class="btn btn-block btn-lg" type="submit" style="margin-top:6px">Continue to demo</button>
+        </form>`;
+      document.getElementById("leadForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector("button");
+        btn.disabled = true; btn.textContent = "One moment…";
+        try {
+          await Api.submitDemoLead(
+            document.getElementById("bizName").value.trim(),
+            document.getElementById("bizPhone").value.trim()
+          );
+          renderDemoAccess();
+        } catch (ex) {
+          App.toast(ex.message || "Couldn't submit — please try again");
+          btn.disabled = false; btn.textContent = "Continue to demo";
+        }
+      });
+    }
+
+    function renderDemoAccess() {
+      const customerUrl = `${location.origin}/index.html?r=${DEMO_SLUG}`;
+      const qrSvg = QR.toSVG(customerUrl, { width: 168, color: "#0a3d28" });
+      content.innerHTML = `
+        <div class="section" style="padding-top:0;text-align:center">
+          <div style="color:var(--green-700)">${App.icon("check", 34)}</div>
+          <h1 style="font-family:var(--serif);font-size:24px;font-weight:600;margin-top:6px">You're in!</h1>
+          <p style="color:var(--muted);font-size:14px;margin-top:4px">Here's your access to the live demo.</p>
+        </div>
+        <div class="section" style="padding-top:6px">
+          <div class="card" style="padding:20px;text-align:center">
+            <div class="eyebrow" style="margin-bottom:8px">RESTAURANT ADMIN DASHBOARD</div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Manage menu, orders, staff, analytics — exactly what a real owner sees.</p>
+            <a class="btn btn-block btn-lg" href="login.html?r=${DEMO_SLUG}&demo=1">${App.icon("dashboard", 18)} Open Admin Dashboard</a>
+          </div>
+        </div>
+        <div class="section" style="padding-top:0">
+          <div class="card" style="padding:20px;text-align:center">
+            <div class="eyebrow" style="margin-bottom:8px">CUSTOMER ORDERING VIEW</div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Scan this with your phone to see what a customer sees after scanning a table's QR code.</p>
+            <div style="display:flex;justify-content:center;margin-bottom:12px">${qrSvg}</div>
+            <a class="btn btn-ghost btn-block" href="${customerUrl}" target="_blank" rel="noopener">Or open on this device</a>
+          </div>
+        </div>`;
+    }
+
+    renderForm();
+  </script>
+</body>
+</html>

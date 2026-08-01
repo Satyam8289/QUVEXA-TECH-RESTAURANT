@@ -78,6 +78,10 @@ const Api = (() => {
   /* ==================== PUBLIC (customer) ==================== */
   const resolveDomain = (host) => req(`/public/domain/${encodeURIComponent(host)}`);
 
+  /* Public demo-gate lead capture (demo.html) — not tenant-scoped. */
+  const submitDemoLead = (businessName, phone) =>
+    req(`/public/demo-lead`, { method: "POST", body: { businessName, phone } });
+
   /* Custom domain → tenant resolution. If a restaurant has pointed their own
      domain (e.g. foodhouse.com) at this app, figure out which tenant that is
      BEFORE loading data — same multi-tenant app, just a different lookup key
@@ -225,7 +229,7 @@ const Api = (() => {
     loadPublic, getMenuPublic, getCategoriesPublic, placeOrderPublic, getOrderByCode, myOrders, lookupBranding,
     razorpayCreateOrder, razorpayVerifyAndPlaceOrder, uploadImage,
     loyaltyStatus, submitFeedback, getCombos, saveCombo, deleteCombo, getFeedback,
-    resolveDomain, ensureTenantResolved,
+    resolveDomain, ensureTenantResolved, submitDemoLead,
     login, logout, isAuthed, currentUser, me, requireAuth, authReq,
     getMenu, saveMenuItem, deleteMenuItem, getCategories, getTables, addTable,
     getOrders, createOrder, updateOrderStatus, collectPayment,

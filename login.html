@@ -54,6 +54,15 @@
     // If already signed in, go straight to the dashboard.
     if (Api.isAuthed()) location.replace("dashboard.html");
 
+    // Demo-gate handoff (demo.html): pre-fill the dedicated sandbox account's
+    // credentials — hardcoded here, never passed through the URL, and only
+    // for this one safe demo tenant (real menu, zero real orders/customers).
+    const params0 = new URLSearchParams(location.search);
+    if (params0.get("r") === "quvexa-demo" && params0.get("demo") === "1") {
+      document.getElementById("username").value = "demo_owner";
+      document.getElementById("password").value = "QuvexaDemo@2026";
+    }
+
     document.getElementById("mark").innerHTML = App.icon("leaf", 24);
     document.getElementById("errIco").innerHTML = App.icon("alert", 16);
     document.getElementById("offlineIco").innerHTML = App.icon("alert", 15);

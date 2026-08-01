@@ -12,7 +12,13 @@ const Api = (() => {
   // Same-origin by default — server.js serves the API and this frontend from
   // one process/URL in both dev and production. Only set window.FH_API_BASE
   // if the API is genuinely hosted on a different origin than the frontend.
-  const BASE = (window.FH_API_BASE || "") + "/api";
+  // Same-origin when this frontend is served by the VPS itself (server.js
+  // serves API + static files from one process). When these same static
+  // files are instead deployed to Vercel, there's no backend on that origin
+  // at all — cross the wire to the VPS's own API domain explicitly.
+  const CROSS_ORIGIN_API = "https://api.quvexatech.com";
+  const onVercel = /\.vercel\.app$/.test(location.hostname) || location.hostname === "app.quvexatech.com";
+  const BASE = (window.FH_API_BASE || (onVercel ? CROSS_ORIGIN_API : "")) + "/api";
 
   const SLUG_KEY = "foodhouse-tenant-slug";
   const TOKEN_KEY = "foodhouse-token";

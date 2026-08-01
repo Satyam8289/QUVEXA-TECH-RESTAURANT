@@ -1,0 +1,8 @@
+# Vercel only needs the static customer/staff frontend — the backend runs on
+# the VPS (stateful Node process + Postgres, which Vercel's serverless model
+# can't host). Excluding these keeps the Vercel deploy small and never
+# exposes backend source or deploy scripts through the frontend's origin.
+backend/
+deploy/
+.git/
+README.md

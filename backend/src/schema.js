@@ -182,6 +182,15 @@ UPDATE orders SET payment_collected = true WHERE method NOT IN ('Cash','Razorpay
 -- owner/manager/waiter accounts. Logs into a distinct Super Admin panel to
 -- onboard new restaurants and manage their domains, not into any one
 -- restaurant's dashboard.
+-- Leads from the public demo gate (company website "try the demo" flow) —
+-- platform-level, not tied to any tenant, visible only in Super Admin.
+CREATE TABLE IF NOT EXISTS demo_leads (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_name  TEXT NOT NULL,
+  phone          TEXT NOT NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS platform_admins (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   username       TEXT UNIQUE NOT NULL,

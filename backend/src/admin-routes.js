@@ -131,4 +131,15 @@ r.patch("/tenants/:id", platformAuth, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
+/* ==================== DEMO LEADS ==================== */
+/* Submitted via POST /api/public/demo-lead (routes.js) from the company
+   website's "try the demo" gate — visible only here, never on the public
+   internet. */
+r.get("/demo-leads", platformAuth, h(async (req, res) => {
+  const { rows } = await q(
+    `SELECT id, business_name AS "businessName", phone, created_at AS "createdAt"
+     FROM demo_leads ORDER BY created_at DESC LIMIT 500`);
+  res.json(rows);
+}));
+
 export default r;

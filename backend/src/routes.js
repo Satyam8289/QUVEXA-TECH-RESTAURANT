@@ -634,6 +634,19 @@ async function loadTenant(req, res, next) {
   next();
 }
 
+/* Lead capture for the company website's public "try the demo" gate — not
+   tied to any tenant. Rate-limited since it's unauthenticated and reachable
+   from the open internet. Visible only in Super Admin (GET /platform/demo-leads). */
+const demoLeadLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, label: "demo-lead" });
+r.post("/public/demo-lead", demoLeadLimiter, h(async (req, res) => {
+  const businessName = String(req.body?.businessName || "").trim().slice(0, 200);
+  const phone = String(req.body?.phone || "").trim().slice(0, 20);
+  if (!businessName || phone.replace(/\D/g, "").length < 6)
+    return res.status(400).json({ error: "Please enter your business name and a valid phone number" });
+  await q("INSERT INTO demo_leads (business_name, phone) VALUES ($1,$2)", [businessName, phone]);
+  res.status(201).json({ ok: true });
+}));
+
 /* Custom domain → tenant resolution. When a restaurant points their own
    domain (e.g. foodhouse.com) at this app via DNS, the frontend calls this
    once on load to find out which restaurant that domain belongs to — then

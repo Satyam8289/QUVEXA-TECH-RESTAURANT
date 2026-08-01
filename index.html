@@ -95,13 +95,6 @@
         document.getElementById("tname").textContent = data.tenant.name;
         document.getElementById("ttag").textContent  = data.tenant.tagline || "";
         document.getElementById("addr").textContent  = data.tenant.address || "";
-        // Takeaway must be prepaid, so it's only offered once the restaurant
-        // has connected Razorpay — otherwise there's no way to pay for it.
-        razorpayReady = !!data.tenant.razorpayEnabled;
-        if (!razorpayReady) {
-          document.getElementById("takeawayOpt").classList.add("disabled");
-          document.getElementById("takeawaySub").textContent = "Not available at this restaurant yet";
-        }
       } catch (e) {
         App.toast(e.message || "Can't reach the restaurant server. Please check your connection.");
       }

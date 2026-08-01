@@ -1,8 +1,4 @@
 {
   "cleanUrls": true,
-  "trailingSlash": false,
-  "rewrites": [
-    { "source": "/probe2", "has": [{ "type": "header", "key": "host", "value": "superadmin.quvexatech.com" }], "destination": "/superadmin.html" },
-    { "source": "/", "has": [{ "type": "header", "key": "host", "value": "superadmin.quvexatech.com" }], "destination": "/superadmin.html" }
-  ]
+  "trailingSlash": false
 }

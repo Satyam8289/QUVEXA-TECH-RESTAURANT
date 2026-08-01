@@ -100,7 +100,7 @@ h3{ font-size: 1.1rem; }
   transition: border-color .3s var(--ease), box-shadow .3s var(--ease);
 }
 .site-header.scrolled{ border-bottom-color: var(--border); box-shadow: 0 4px 20px -12px rgba(20,20,43,0.1); }
-.header-inner{ display: flex; align-items: center; gap: 26px; height: 76px; }
+.header-inner{ display: flex; align-items: center; gap: 26px; height: 88px; }
 
 .brand{ display: flex; align-items: center; gap: 9px; margin-right: auto; }
 .brand-full{ display: flex; align-items: center; }
@@ -150,7 +150,7 @@ h3{ font-size: 1.1rem; }
 .mobile-nav.open{ display: flex; }
 
 /* ================= Hero ================= */
-.hero{ position: relative; padding: 150px 0 90px; background: linear-gradient(180deg, #fbfaff, #ffffff 60%); overflow: hidden; }
+.hero{ position: relative; padding: 162px 0 90px; background: linear-gradient(180deg, #fbfaff, #ffffff 60%); overflow: hidden; }
 .hero-inner{ position: relative; display: grid; grid-template-columns: 0.95fr 1.15fr; gap: 44px; align-items: center; }
 
 .hero-badge{
@@ -446,7 +446,7 @@ h3{ font-size: 1.1rem; }
 
   .hero-inner{ grid-template-columns: 1fr; }
   .hero-visual{ order: -1; }
-  .hero{ padding-top: 130px; }
+  .hero{ padding-top: 142px; }
 
   .why-grid{ grid-template-columns: 1fr 1fr; }
   .product-grid{ grid-template-columns: 1fr 1fr; }
@@ -462,7 +462,7 @@ h3{ font-size: 1.1rem; }
 
 @media (max-width: 640px){
   .wrap{ padding: 0 18px; }
-  .hero{ padding: 118px 0 56px; }
+  .hero{ padding: 130px 0 56px; }
   .hero-title{ font-size: clamp(1.9rem, 8vw, 2.3rem); }
   .hero-ctas{ flex-direction: column; align-items: stretch; }
   .hero-ctas .btn{ width: 100%; }

@@ -6,7 +6,13 @@
    ============================================================ */
 
 const AdminApi = (() => {
-  const BASE = (window.FH_API_BASE || "") + "/api/platform";
+  // Same cross-origin rule as js/api.js: this panel is served statically from
+  // Vercel (app.quvexatech.com or superadmin.quvexatech.com), so it has to
+  // cross the wire to the VPS's own API domain — there's no backend on those
+  // origins at all.
+  const CROSS_ORIGIN_API = "https://api.quvexatech.com";
+  const onVercel = /\.vercel\.app$/.test(location.hostname) || location.hostname === "app.quvexatech.com" || location.hostname === "superadmin.quvexatech.com";
+  const BASE = (window.FH_API_BASE || (onVercel ? CROSS_ORIGIN_API : "")) + "/api/platform";
   const TOKEN_KEY = "foodhouse-platform-token";
   const ADMIN_KEY = "foodhouse-platform-admin";
 

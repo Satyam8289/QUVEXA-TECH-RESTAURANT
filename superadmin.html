@@ -194,7 +194,12 @@
         addModal.classList.remove("open");
         document.getElementById("addForm").reset();
         document.getElementById("f-tables").value = 12;
-        const link = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}${result.customerLink.replace(/^\//, "")}`;
+        // Super Admin can be reached from its own subdomain (superadmin.quvexatech.com)
+        // or from app.quvexatech.com/superadmin.html — either way, the customer
+        // link handed to a new owner must point at the customer-facing app, not
+        // wherever this admin panel happens to be hosted.
+        const customerOrigin = location.hostname === "superadmin.quvexatech.com" ? "https://app.quvexatech.com" : location.origin;
+        const link = `${customerOrigin}/${result.customerLink.replace(/^\//, "")}`;
         document.getElementById("successModal").innerHTML = `
           <div style="color:var(--green-700);margin-bottom:10px">${App.icon("check",44)}</div>
           <h3 style="font-family:var(--serif);font-size:20px;margin-bottom:6px">${result.name} is live</h3>

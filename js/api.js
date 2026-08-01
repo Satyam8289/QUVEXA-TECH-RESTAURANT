@@ -17,7 +17,7 @@ const Api = (() => {
   // files are instead deployed to Vercel, there's no backend on that origin
   // at all — cross the wire to the VPS's own API domain explicitly.
   const CROSS_ORIGIN_API = "https://api.quvexatech.com";
-  const onVercel = /\.vercel\.app$/.test(location.hostname) || location.hostname === "app.quvexatech.com";
+  const onVercel = /\.vercel\.app$/.test(location.hostname) || location.hostname === "app.quvexatech.com" || location.hostname === "superadmin.quvexatech.com";
   const BASE = (window.FH_API_BASE || (onVercel ? CROSS_ORIGIN_API : "")) + "/api";
 
   const SLUG_KEY = "foodhouse-tenant-slug";

@@ -340,6 +340,12 @@ h3{ font-size: 1.1rem; }
   background: var(--bg-soft); padding: 6px 12px; border-radius: 999px;
 }
 .product-tile.expanded{ border-color: var(--purple); box-shadow: var(--shadow-md); }
+.product-try{
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 14px;
+  font-size: 0.82rem; font-weight: 700; color: #1fae7a; text-decoration: none;
+  transition: gap .2s var(--ease);
+}
+.product-try:hover{ gap: 8px; text-decoration: underline; }
 
 /* ================= Tech Stack (marquee) ================= */
 .tech-stack{ padding: 70px 0 90px; background: var(--bg-alt); overflow: hidden; }
@@ -373,6 +379,8 @@ h3{ font-size: 1.1rem; }
 .contact-copy .section-sub{ max-width: 380px; }
 
 .contact-form{ position: relative; background: #fff; border-radius: var(--radius-lg); padding: 40px; box-shadow: var(--shadow-lg); }
+/* Honeypot — invisible to real users, catches basic form-spam bots that auto-fill every field. */
+.hp-field{ position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .form-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .field{ display: flex; flex-direction: column; gap: 8px; }
 .field-full{ grid-column: 1 / -1; }

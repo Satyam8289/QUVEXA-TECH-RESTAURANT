@@ -31,7 +31,7 @@
 <header class="site-header" id="siteHeader">
   <div class="wrap header-inner">
     <a href="#top" class="brand brand-full" aria-label="Quvexa Tech home">
-      <img src="assets/logo.png" alt="Quvexa Tech" class="brand-logo-img" width="52" height="52" onerror="this.onerror=null;this.src='assets/logo.svg'">
+      <img src="assets/logo.png" alt="Quvexa Tech" class="brand-logo-img" width="52" height="52">
     </a>
 
     <nav class="main-nav" aria-label="Primary">
@@ -282,7 +282,7 @@
       <p class="center-sub reveal">Two products live today. More in active development.</p>
 
       <div class="product-grid">
-        <button type="button" class="product-tile reveal" data-status="live">
+        <div class="product-tile reveal" data-status="live" role="button" tabindex="0">
           <span class="product-tile-top">
             <span class="product-tile-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 3v9a3 3 0 006 0V3M12 3v9" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M9 12v9" stroke="currentColor" stroke-width="1.7"/><path d="M18 3s-2 3-2 6 2 3 2 3v9" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/></svg></span>
             <span class="product-tag product-tag-live">Live</span>
@@ -292,7 +292,8 @@
           <span class="product-expand" aria-hidden="true">
             <span>QR ordering</span><span>Kitchen display</span><span>Live order tracking</span>
           </span>
-        </button>
+          <a class="product-try" href="https://app.quvexatech.com/demo.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Try the live demo →</a>
+        </div>
 
         <button type="button" class="product-tile reveal" data-status="live">
           <span class="product-tile-top">
@@ -440,6 +441,11 @@
           <p>Thanks — we'll get back to you within one business day.</p>
         </div>
 
+        <div class="hp-field" aria-hidden="true">
+          <label for="company">Company</label>
+          <input type="text" id="company" name="company" tabindex="-1" autocomplete="off">
+        </div>
+
         <div class="form-grid">
           <div class="field">
             <label for="name">Name</label>
@@ -490,7 +496,7 @@
   <div class="wrap footer-inner">
     <div class="footer-brand">
       <a href="#top" class="brand brand-full" aria-label="Quvexa Tech home">
-        <img src="assets/logo.png" alt="Quvexa Tech" class="brand-logo-img" width="60" height="60" onerror="this.onerror=null;this.src='assets/logo.svg'">
+        <img src="assets/logo.png" alt="Quvexa Tech" class="brand-logo-img" width="60" height="60">
       </a>
       <p class="footer-tagline">© 2025 Quvexa Tech. All rights reserved.</p>
       <div class="social-row">

@@ -5,6 +5,15 @@
   const yearEl = document.getElementById('year');
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 
+  // Logo fallback — if the real logo file is missing, fall back to the placeholder mark.
+  // (Kept in JS rather than inline onerror= so the CSP script-src can stay strict.)
+  document.querySelectorAll('.brand-logo-img').forEach((img) => {
+    img.addEventListener('error', function onLogoError() {
+      img.removeEventListener('error', onLogoError);
+      img.src = 'assets/logo.svg';
+    });
+  });
+
   // Loading screen — hide once everything is painted
   const loader = document.getElementById('loader');
   const hideLoader = () => loader && loader.classList.add('loader-hidden');
@@ -39,13 +48,19 @@
 
   // Interactive product tiles — click to expand feature chips
   document.querySelectorAll('.product-tile').forEach((tile) => {
-    tile.addEventListener('click', () => {
+    const toggle = () => {
       const wasExpanded = tile.classList.contains('expanded');
       document.querySelectorAll('.product-tile.expanded').forEach(t => {
         if (t !== tile) t.classList.remove('expanded');
       });
       tile.classList.toggle('expanded', !wasExpanded);
-    });
+    };
+    tile.addEventListener('click', toggle);
+    if (tile.getAttribute('role') === 'button') {
+      tile.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+      });
+    }
   });
 
   // Header scroll state
@@ -119,6 +134,10 @@
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
+
+    // Honeypot: real users never see or fill this field. If it has a value, silently drop the submit.
+    const honeypot = form.querySelector('#company');
+    if (honeypot && honeypot.value.trim() !== '') return;
 
     const fields = Array.from(form.querySelectorAll('.field')).filter(f =>
       f.querySelector('input[required], select[required], textarea[required]')

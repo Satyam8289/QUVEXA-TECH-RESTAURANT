@@ -24,6 +24,21 @@
     const DEMO_SLUG = "quvexa-demo";
     const content = document.getElementById("content");
 
+    // Public demo link — many different visitors may open it on the same
+    // device over time. Wipe any name/phone/cart/table left over from a
+    // previous visitor (or an earlier test run) so it always starts clean.
+    function resetDemoData() {
+      localStorage.removeItem(`foodhouse-customer:${DEMO_SLUG}`);
+      localStorage.removeItem(`foodhouse-cart:${DEMO_SLUG}`);
+      localStorage.removeItem("foodhouse-table");
+      localStorage.removeItem("foodhouse-tableLocked");
+      localStorage.removeItem("foodhouse-orderType");
+      localStorage.removeItem("foodhouse-vehicle");
+      localStorage.removeItem("foodhouse-lastOrder");
+      localStorage.removeItem("foodhouse-lastOrderToken");
+    }
+    resetDemoData();
+
     document.querySelector(".brand-mark").innerHTML = App.icon("leaf", 26);
 
     function renderForm() {

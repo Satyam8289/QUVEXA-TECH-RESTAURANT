@@ -10,6 +10,7 @@
 <body class="customer">
   <div class="phone">
     <div id="brand"></div>
+    <div id="notifyBanner"></div>
     <div id="content"></div>
   </div>
 
@@ -24,11 +25,53 @@
       { key: "served",    title: "Served",         sub: "Enjoy your meal!" },
     ];
     const ORDER_OF = { pending: 0, preparing: 1, ready: 2, served: 3 };
+    // What to tell the customer when their order reaches each stage — only
+    // the stages worth interrupting them for (not the initial "placed").
+    const NOTIFY_TEXT = {
+      preparing: "The kitchen has started cooking your order.",
+      ready:     "Your order is ready! 🎉",
+      served:    "Enjoy your meal!",
+    };
     let googleReviewUrl = "";
     const params = new URLSearchParams(location.search);
     const code = params.get("id") || localStorage.getItem("foodhouse-lastOrder");
     const token = params.get("t") || localStorage.getItem("foodhouse-lastOrderToken") || "";
     let lastStatus = null;
+
+    /* Browser push notifications for order-status changes — free, no backend
+       or Meta setup needed. On Android, `new Notification()` isn't available
+       at all; it must go through a ServiceWorkerRegistration instead, so we
+       register a (deliberately empty) service worker just to enable that. */
+    let swRegistration = null;
+    async function setupNotifications() {
+      if (!("Notification" in window)) return; // unsupported browser — silently skip
+      if ("serviceWorker" in navigator) {
+        try { swRegistration = await navigator.serviceWorker.register("/sw.js"); } catch (e) { /* proceed without it */ }
+      }
+      if (Notification.permission === "default") renderNotifyBanner();
+    }
+    function renderNotifyBanner() {
+      const el = document.getElementById("notifyBanner");
+      el.innerHTML = `
+        <div class="section" style="padding-bottom:0">
+          <div class="card" style="padding:14px 16px;display:flex;align-items:center;gap:12px">
+            <span style="color:var(--green-700)">${App.icon("alert", 20)}</span>
+            <p style="flex:1;font-size:12.5px;margin:0">Get notified the moment your order is ready — even if you switch apps.</p>
+            <button class="btn" id="notifyEnableBtn" style="padding:9px 14px;font-size:13px;white-space:nowrap">Enable</button>
+          </div>
+        </div>`;
+      document.getElementById("notifyEnableBtn").addEventListener("click", async () => {
+        const perm = await Notification.requestPermission();
+        el.innerHTML = "";
+        if (perm === "granted") App.toast("Notifications on — we'll let you know!");
+      });
+    }
+    async function notify(title, body) {
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+      const opts = { body, tag: "order-status" }; // tag replaces any earlier notification instead of stacking
+      if (swRegistration) { try { await swRegistration.showNotification(title, opts); return; } catch (e) { /* fall through */ } }
+      try { new Notification(title, opts); } catch (e) { /* Android without a working SW — nothing more we can do */ }
+    }
 
     async function render() {
       const content = document.getElementById("content");
@@ -45,6 +88,9 @@
       // The 4s poll only needs to redraw when something actually changed —
       // otherwise it would wipe out a half-typed feedback comment.
       if (order.status === lastStatus) return;
+      // Only notify on a genuine transition (lastStatus !== null), never on
+      // the very first load of an order that's already past "pending".
+      if (lastStatus !== null && NOTIFY_TEXT[order.status]) notify(`Order ${order.code}`, NOTIFY_TEXT[order.status]);
       lastStatus = order.status;
       const cur = ORDER_OF[order.status];
 
@@ -110,6 +156,7 @@
     async function main() {
       try { googleReviewUrl = (await Api.loadPublic()).tenant.googleReviewUrl || ""; } catch (e) { /* still try to render the order below */ }
       document.getElementById("brand").innerHTML = App.brandBar({ back: "menu.html", subtitle: "Live Tracking" });
+      setupNotifications();
       await render();
       App.mountBottomNav("orders");
       setInterval(render, 4000);   // reflect kitchen status changes live

@@ -256,7 +256,7 @@
         showOrderTypeOverlay(data.tenant);
       } catch (e) {
         document.getElementById("menuList").innerHTML =
-          `<div class="empty">${App.icon("alert",40)}<h3>Can't load the menu</h3><p>Please check your connection and try again.</p></div>`;
+          `<div class="empty">${App.icon("alert",40)}<h3>Can't load the menu</h3><p>${App.esc(e.message) || "Please check your connection and try again."}</p></div>`;
       }
     }
     main();

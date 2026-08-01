@@ -28,7 +28,10 @@ const Api = (() => {
   function tenantSlug() {
     const fromUrl = new URLSearchParams(location.search).get("r");
     if (fromUrl) { localStorage.setItem(SLUG_KEY, fromUrl); return fromUrl; }
-    return localStorage.getItem(SLUG_KEY) || "food-house";
+    // No hardcoded fallback tenant — this is a shared multi-tenant domain
+    // (app.quvexatech.com), not any one restaurant's own site, so there's no
+    // sensible default. loadPublic() surfaces a clear error when this is empty.
+    return localStorage.getItem(SLUG_KEY) || "";
   }
   const setTenantSlug = (s) => localStorage.setItem(SLUG_KEY, s);
 
@@ -97,7 +100,15 @@ const Api = (() => {
 
   async function loadPublic() {
     await ensureTenantResolved();
-    const data = await req(`/public/${tenantSlug()}`);
+    const slug = tenantSlug();
+    if (!slug) {
+      // Landed on the shared platform domain with no ?r=, no custom-domain
+      // match, and no restaurant remembered from an earlier visit — there's
+      // nothing to load. Fails fast with a clear reason instead of a
+      // confusing generic "can't reach the server" from a doomed request.
+      throw new Error("No restaurant specified. Please use the link or QR code your restaurant gave you.");
+    }
+    const data = await req(`/public/${slug}`);
     cache = { tenant: data.tenant, categories: data.categories, menu: data.menu, tables: data.tables };
     return cache;
   }

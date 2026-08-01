@@ -5,6 +5,49 @@
   const yearEl = document.getElementById('year');
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 
+  // Loading screen — hide once everything is painted
+  const loader = document.getElementById('loader');
+  const hideLoader = () => loader && loader.classList.add('loader-hidden');
+  if (document.readyState === 'complete') {
+    hideLoader();
+  } else {
+    window.addEventListener('load', hideLoader);
+    window.setTimeout(hideLoader, 1800); // safety fallback
+  }
+
+  // Scroll progress bar
+  const scrollProgress = document.getElementById('scrollProgress');
+  const updateScrollProgress = () => {
+    if (!scrollProgress) return;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = docHeight > 0 ? (window.scrollY / docHeight) * 100 : 0;
+    scrollProgress.style.width = pct + '%';
+  };
+  updateScrollProgress();
+  window.addEventListener('scroll', updateScrollProgress, { passive: true });
+  window.addEventListener('resize', updateScrollProgress);
+
+  // Cursor glow — desktop pointer devices only
+  const cursorGlow = document.getElementById('cursorGlow');
+  if (cursorGlow && window.matchMedia('(pointer: fine)').matches) {
+    window.addEventListener('mousemove', (e) => {
+      cursorGlow.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
+      cursorGlow.classList.add('active');
+    }, { passive: true });
+    window.addEventListener('mouseleave', () => cursorGlow.classList.remove('active'));
+  }
+
+  // Interactive product tiles — click to expand feature chips
+  document.querySelectorAll('.product-tile').forEach((tile) => {
+    tile.addEventListener('click', () => {
+      const wasExpanded = tile.classList.contains('expanded');
+      document.querySelectorAll('.product-tile.expanded').forEach(t => {
+        if (t !== tile) t.classList.remove('expanded');
+      });
+      tile.classList.toggle('expanded', !wasExpanded);
+    });
+  });
+
   // Header scroll state
   const header = document.getElementById('siteHeader');
   const onScroll = () => {

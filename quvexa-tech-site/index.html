@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quvexa Tech — One Platform. Every Business. Endless Possibilities.</title>
 <meta name="description" content="Quvexa Tech helps businesses simplify operations, automate workflows and make smarter decisions with powerful software — School ERP, Restaurant POS, E-commerce and more.">
-<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="icon" href="assets/logo.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
@@ -13,41 +13,39 @@
 </head>
 <body>
 
+<!-- LOADING SCREEN -->
+<div class="loader" id="loader" aria-hidden="true">
+  <div class="loader-mark">
+    <svg viewBox="0 0 100 100" width="56" height="56"><circle cx="44" cy="44" r="26" fill="none" stroke="#7c5cfc" stroke-width="14" stroke-linecap="round" stroke-dasharray="140 34" transform="rotate(58 44 44)"/><line x1="55" y1="55" x2="82" y2="82" stroke="#7c5cfc" stroke-width="14" stroke-linecap="round"/></svg>
+  </div>
+</div>
+
+<!-- SCROLL PROGRESS -->
+<div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
+
+<!-- CURSOR GLOW (desktop only, added by JS) -->
+<div class="cursor-glow" id="cursorGlow" aria-hidden="true"></div>
+
 <a class="skip-link" href="#main">Skip to content</a>
 
 <header class="site-header" id="siteHeader">
   <div class="wrap header-inner">
-    <a href="#top" class="brand" aria-label="Quvexa Tech home">
-      <span class="brand-mark">
-        <img src="assets/logo.svg" alt="" class="brand-logo-img" width="30" height="30">
-      </span>
-      <span class="brand-text">
-        <span class="brand-name">QUVEXA</span>
-        <span class="brand-tech">TECH</span>
-      </span>
+    <a href="#top" class="brand brand-full" aria-label="Quvexa Tech home">
+      <img src="assets/logo.png" alt="Quvexa Tech" class="brand-logo-img" width="52" height="52" onerror="this.onerror=null;this.src='assets/logo.svg'">
     </a>
 
     <nav class="main-nav" aria-label="Primary">
       <div class="nav-dropdown">
         <button class="nav-drop-btn" aria-expanded="false">Products <svg class="chev" viewBox="0 0 12 8" width="10" height="7"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.6" fill="none"/></svg></button>
         <div class="nav-drop-panel">
-          <a href="#products">Quvexa School ERP</a>
-          <a href="#products">Quvexa Restaurant POS</a>
-          <a href="#products">Quvexa Commerce Cloud</a>
+          <a href="#products">Restaurant Suite <small>Live</small></a>
+          <a href="#products">School ERP <small>Live</small></a>
+          <a href="#products">View all products</a>
         </div>
       </div>
 
-      <div class="nav-dropdown">
-        <button class="nav-drop-btn" aria-expanded="false">Solutions <svg class="chev" viewBox="0 0 12 8" width="10" height="7"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.6" fill="none"/></svg></button>
-        <div class="nav-drop-panel">
-          <a href="#products">Education</a>
-          <a href="#products">Restaurants</a>
-          <a href="#products">Retail</a>
-          <a href="#products">Healthcare</a>
-        </div>
-      </div>
-
-      <a href="#features">Features</a>
+      <a href="#why">Why Quvexa</a>
+      <a href="#process">Process</a>
       <a href="#pricing">Pricing</a>
 
       <div class="nav-dropdown">
@@ -75,8 +73,8 @@
 
   <div class="mobile-nav" id="mobileNav">
     <a href="#products">Products</a>
-    <a href="#products">Solutions</a>
-    <a href="#features">Features</a>
+    <a href="#why">Why Quvexa</a>
+    <a href="#process">Process</a>
     <a href="#pricing">Pricing</a>
     <a href="#contact">Resources</a>
     <a href="#contact">About Us</a>
@@ -91,7 +89,7 @@
   <section class="hero" id="top">
     <div class="wrap hero-inner">
       <div class="hero-copy reveal">
-        <span class="hero-badge">All-in-One Business Management Platform</span>
+        <span class="hero-badge">AI-First Software Studio</span>
         <h1 class="hero-title">
           One Platform.<br>
           Every Business.<br>
@@ -124,10 +122,7 @@
       <div class="hero-visual reveal" aria-hidden="true">
         <div class="device-frame">
           <div class="device-bar">
-            <span class="device-brand">
-              <img src="assets/logo.svg" alt="" width="14" height="14">
-              QUVEXA
-            </span>
+            <span class="device-brand">QUVEXA</span>
             <div class="device-search">
               <svg viewBox="0 0 24 24" width="13" height="13"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="15" y1="15" x2="20" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
               Search anything...
@@ -197,110 +192,215 @@
     </div>
   </section>
 
-  <!-- SOLUTIONS -->
-  <section class="industries" id="products">
-    <div class="wrap">
-      <h2 class="reveal center-head">Solutions for Every Industry</h2>
-      <p class="center-sub reveal">Powerful software to manage and grow your business.</p>
+  <!-- OUR VISION -->
+  <section class="vision">
+    <div class="wrap vision-inner">
+      <p class="eyebrow reveal">Our Vision</p>
+      <h2 class="vision-statement reveal">
+        Building intelligent software that helps businesses
+        <span class="grad-text">automate, grow, and scale.</span>
+      </h2>
+    </div>
+  </section>
 
-      <div class="industry-grid">
-        <a href="#contact" class="industry-card reveal">
-          <span class="industry-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 9l9-5 9 5-9 5-9-5z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3 9v6l9 5 9-5V9" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span>
-          <h3>School &amp; Education</h3>
-          <p>Manage schools, students, fees, attendance, exams and more.</p>
-        </a>
-        <a href="#contact" class="industry-card reveal">
-          <span class="industry-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 3v9a3 3 0 006 0V3M12 3v9" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M9 12v9" stroke="currentColor" stroke-width="1.7"/><path d="M18 3s-2 3-2 6 2 3 2 3v9" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/></svg></span>
-          <h3>Restaurants &amp; Food</h3>
-          <p>Simplify orders, billing, kitchen operations and customer experience.</p>
-        </a>
-        <a href="#contact" class="industry-card reveal">
-          <span class="industry-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 6h13l-1.5 8h-10z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="19" r="1.4" fill="currentColor"/><circle cx="16" cy="19" r="1.4" fill="currentColor"/></svg></span>
-          <h3>E-Commerce &amp; Retail</h3>
-          <p>Launch and scale your online store with powerful management tools.</p>
-        </a>
-        <a href="#contact" class="industry-card reveal">
-          <span class="industry-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 21s-7-4.6-9.3-9C.8 8 3 4 7 4c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 4 0 6.2 4 4.3 8-2.3 4.4-9.3 9-9.3 9z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></span>
-          <h3>Healthcare</h3>
-          <p>Manage patients, appointments, records and streamline healthcare operations.</p>
-        </a>
-        <a href="#contact" class="industry-card reveal">
-          <span class="industry-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 16V6h9v10M4 16h13M13 9h4l3 3v4h-7V9z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="7.5" cy="18" r="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="17" cy="18" r="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
-          <h3>Logistics &amp; Delivery</h3>
-          <p>Optimize deliveries, routes, fleet and logistics operations.</p>
-        </a>
-        <a href="#contact" class="industry-card reveal">
-          <span class="industry-icon"><svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span>
-          <h3>And More</h3>
-          <p>Custom solutions for every type of business, built around your workflow.</p>
-        </a>
+  <!-- WHY QUVEXA TECH -->
+  <section class="why-quvexa" id="why">
+    <div class="wrap">
+      <p class="eyebrow reveal center-head-eyebrow">Why Quvexa Tech</p>
+      <h2 class="reveal center-head">Engineered for the long run.</h2>
+      <p class="center-sub reveal">Not a template. Not a shortcut. Software built to hold up.</p>
+
+      <div class="why-grid">
+        <div class="why-card reveal">
+          <span class="why-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 3l2.2 5.2L20 10l-5.2 2.2L12 17l-2.2-4.8L5 10l5.8-1.8z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
+          <h3>AI-First Development</h3>
+          <p>Intelligence built into the core of every product, not bolted on after.</p>
+        </div>
+        <div class="why-card reveal">
+          <span class="why-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M13 2L4 14h6l-1 8 9-12h-6z" fill="currentColor"/></svg></span>
+          <h3>Performance Optimized</h3>
+          <p>Fast by default — every screen tuned for speed, not just function.</p>
+        </div>
+        <div class="why-card reveal">
+          <span class="why-icon"><svg viewBox="0 0 24 24" width="22" height="22"><rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 10V7a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span>
+          <h3>Secure Architecture</h3>
+          <p>Isolation and access control designed in from the first line of code.</p>
+        </div>
+        <div class="why-card reveal">
+          <span class="why-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 17V7l8-4 8 4v10l-8 4-8-4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.7"/></svg></span>
+          <h3>Modern Tech Stack</h3>
+          <p>Next.js, TypeScript, and cloud infrastructure built to age well.</p>
+        </div>
+        <div class="why-card reveal">
+          <span class="why-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 12h4l2-7 4 14 2-7h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
+          <h3>Business-Focused Solutions</h3>
+          <p>Every feature ties back to a real outcome — revenue, time, or trust.</p>
+        </div>
+        <div class="why-card reveal">
+          <span class="why-icon"><svg viewBox="0 0 24 24" width="22" height="22"><circle cx="8" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="16" cy="16" r="3.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M10.5 10.5l3-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+          <h3>Long-Term Partnership</h3>
+          <p>We stay involved after launch — not a handoff, an ongoing relationship.</p>
+        </div>
+        <div class="why-card reveal">
+          <span class="why-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 20V10M12 20V4M20 20v-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+          <h3>Custom-Built Software</h3>
+          <p>Built around how your business actually works, not the other way around.</p>
+        </div>
+        <div class="why-card reveal">
+          <span class="why-icon"><svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span>
+          <h3>Scalable Infrastructure</h3>
+          <p>Architected to grow from your first customer to your thousandth.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- FEATURES -->
-  <section class="features" id="features">
-    <div class="wrap features-inner">
-      <div class="features-copy reveal">
-        <p class="eyebrow">Powerful. Smart. Scalable.</p>
-        <h2>Everything You Need to<br>Run Your Business</h2>
-        <p class="section-sub">Quvexa Tech gives you the tools to manage your business efficiently and focus on what matters most.</p>
+  <!-- OUR PROCESS -->
+  <section class="process" id="process">
+    <div class="wrap">
+      <p class="eyebrow reveal center-head-eyebrow">Our Process</p>
+      <h2 class="reveal center-head">From idea to production.</h2>
+      <p class="center-sub reveal">A disciplined process, not a black box.</p>
 
-        <div class="feature-grid">
-          <div class="feature-item">
-            <span class="feature-icon"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 20V10M12 20V4M20 20v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
-            <div><b>Real-time Analytics</b><p>Get insights and make data-driven decisions.</p></div>
-          </div>
-          <div class="feature-item">
-            <span class="feature-icon"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M13 2L4 14h6l-1 8 9-12h-6z" fill="currentColor"/></svg></span>
-            <div><b>Automated Workflows</b><p>Automate repetitive tasks and save time.</p></div>
-          </div>
-          <div class="feature-item">
-            <span class="feature-icon"><svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
-            <div><b>Role-based Access</b><p>Control access and permissions for your team.</p></div>
-          </div>
-          <div class="feature-item">
-            <span class="feature-icon"><svg viewBox="0 0 24 24" width="18" height="18"><rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 10V7a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
-            <div><b>Secure Data</b><p>Your data is encrypted and backed up securely.</p></div>
-          </div>
-          <div class="feature-item">
-            <span class="feature-icon"><svg viewBox="0 0 24 24" width="18" height="18"><circle cx="8" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 10.5l3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
-            <div><b>Third-party Integrations</b><p>Seamlessly connect with the tools you already use.</p></div>
-          </div>
-          <div class="feature-item">
-            <span class="feature-icon"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 3l2.2 5.2L20 10l-5.2 2.2L12 17l-2.2-4.8L5 10l5.8-1.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
-            <div><b>AI Ready</b><p>Built to integrate with AI tools and future technologies.</p></div>
-          </div>
-        </div>
+      <ol class="process-line">
+        <li class="process-step reveal"><span class="process-num">01</span><h3>Discover</h3><p>Understand the business, the users, the real problem.</p></li>
+        <li class="process-step reveal"><span class="process-num">02</span><h3>Research</h3><p>Study the domain, the edge cases, what "good" looks like here.</p></li>
+        <li class="process-step reveal"><span class="process-num">03</span><h3>Design</h3><p>Wireframe, prototype, and refine before a line of code ships.</p></li>
+        <li class="process-step reveal"><span class="process-num">04</span><h3>Develop</h3><p>Clean, typed, tested code — built to be maintained, not just shipped.</p></li>
+        <li class="process-step reveal"><span class="process-num">05</span><h3>Test</h3><p>Real scenarios, real load, before it ever reaches a real user.</p></li>
+        <li class="process-step reveal"><span class="process-num">06</span><h3>Deploy</h3><p>Careful, monitored releases — no surprises on launch day.</p></li>
+        <li class="process-step reveal"><span class="process-num">07</span><h3>Support</h3><p>We stay on after launch. Software is never really "done."</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- OUR PRODUCTS -->
+  <section class="products-showcase" id="products">
+    <div class="wrap">
+      <p class="eyebrow reveal center-head-eyebrow">Our Products</p>
+      <h2 class="reveal center-head">What we're building.</h2>
+      <p class="center-sub reveal">Two products live today. More in active development.</p>
+
+      <div class="product-grid">
+        <button type="button" class="product-tile reveal" data-status="live">
+          <span class="product-tile-top">
+            <span class="product-tile-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 3v9a3 3 0 006 0V3M12 3v9" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M9 12v9" stroke="currentColor" stroke-width="1.7"/><path d="M18 3s-2 3-2 6 2 3 2 3v9" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/></svg></span>
+            <span class="product-tag product-tag-live">Live</span>
+          </span>
+          <h3>Restaurant Suite</h3>
+          <p>QR ordering, kitchen display, and POS in one connected system.</p>
+          <span class="product-expand" aria-hidden="true">
+            <span>QR ordering</span><span>Kitchen display</span><span>Live order tracking</span>
+          </span>
+        </button>
+
+        <button type="button" class="product-tile reveal" data-status="live">
+          <span class="product-tile-top">
+            <span class="product-tile-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 9l9-5 9 5-9 5-9-5z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3 9v6l9 5 9-5V9" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span>
+            <span class="product-tag product-tag-live">Live</span>
+          </span>
+          <h3>School ERP</h3>
+          <p>Role-aware portals for students, teachers, and staff.</p>
+          <span class="product-expand" aria-hidden="true">
+            <span>Academic sessions</span><span>Payroll</span><span>Exam management</span>
+          </span>
+        </button>
+
+        <button type="button" class="product-tile reveal" data-status="dev">
+          <span class="product-tile-top">
+            <span class="product-tile-icon"><svg viewBox="0 0 24 24" width="22" height="22"><rect x="4" y="9" width="16" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 9V6a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span>
+            <span class="product-tag">In Development</span>
+          </span>
+          <h3>Business CRM</h3>
+          <p>Pipeline, contacts, and follow-ups built for small teams.</p>
+          <span class="product-expand" aria-hidden="true">
+            <span>Deal pipeline</span><span>Contact history</span><span>Task reminders</span>
+          </span>
+        </button>
+
+        <button type="button" class="product-tile reveal" data-status="dev">
+          <span class="product-tile-top">
+            <span class="product-tile-icon"><svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9 10c0-1.5 3-1.5 3 0 0 1-3 1-3 2.5 0 1.5 3 1.5 3 0M12 7v1M12 16v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+            <span class="product-tag">In Development</span>
+          </span>
+          <h3>AI Chat Assistant</h3>
+          <p>A trained assistant that answers customer questions instantly.</p>
+          <span class="product-expand" aria-hidden="true">
+            <span>Trained on your data</span><span>24/7 responses</span><span>Human handoff</span>
+          </span>
+        </button>
+
+        <button type="button" class="product-tile reveal" data-status="dev">
+          <span class="product-tile-top">
+            <span class="product-tile-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 8h16l-1.4 11H5.4z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8V6a4 4 0 018 0v2" stroke="currentColor" stroke-width="1.7" fill="none"/></svg></span>
+            <span class="product-tag">In Development</span>
+          </span>
+          <h3>Inventory Management</h3>
+          <p>Real-time stock tracking across locations and suppliers.</p>
+          <span class="product-expand" aria-hidden="true">
+            <span>Low-stock alerts</span><span>Supplier tracking</span><span>Multi-location</span>
+          </span>
+        </button>
+
+        <button type="button" class="product-tile reveal" data-status="dev">
+          <span class="product-tile-top">
+            <span class="product-tile-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 20V10M12 20V4M20 20v-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+            <span class="product-tag">In Development</span>
+          </span>
+          <h3>Analytics Dashboard</h3>
+          <p>One view of revenue, growth, and performance across your business.</p>
+          <span class="product-expand" aria-hidden="true">
+            <span>Real-time charts</span><span>Custom reports</span><span>Team access</span>
+          </span>
+        </button>
+
+        <button type="button" class="product-tile reveal" data-status="dev">
+          <span class="product-tile-top">
+            <span class="product-tile-icon"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M13 2L4 14h6l-1 8 9-12h-6z" fill="currentColor"/></svg></span>
+            <span class="product-tag">In Development</span>
+          </span>
+          <h3>Automation Platform</h3>
+          <p>Connect your tools and let repetitive work run itself.</p>
+          <span class="product-expand" aria-hidden="true">
+            <span>Workflow builder</span><span>App integrations</span><span>Scheduled triggers</span>
+          </span>
+        </button>
       </div>
+    </div>
+  </section>
 
-      <div class="features-visual reveal" aria-hidden="true">
-        <div class="fv-dots"></div>
-        <div class="laptop-frame">
-          <div class="laptop-screen">
-            <div class="laptop-topbar"><img src="assets/logo.svg" alt="" width="12" height="12"><span>Dashboard</span></div>
-            <div class="laptop-chart-card">
-              <p>Revenue Analytics</p>
-              <svg class="line-chart" viewBox="0 0 220 60" preserveAspectRatio="none">
-                <polyline points="0,45 25,30 50,38 75,15 100,32 125,10 150,26 175,8 220,18" fill="none" stroke="url(#lg2)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                <defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7c5cfc"/><stop offset="1" stop-color="#38d9c4"/></linearGradient></defs>
-              </svg>
-            </div>
-            <div class="laptop-kpis">
-              <div class="mini-kpi"><span>Revenue</span><strong>₹8,42,000</strong></div>
-              <div class="mini-kpi"><span>Growth</span><strong class="up-text">+24%</strong></div>
-            </div>
-          </div>
-          <div class="laptop-base"></div>
-        </div>
-        <div class="phone-frame">
-          <div class="phone-notch"></div>
-          <div class="phone-screen">
-            <p class="phone-title">Today</p>
-            <div class="phone-stat"><span>1,284</span><small>New Orders</small></div>
-            <svg class="mini-spark" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,25 20,18 40,20 60,8 80,12 100,2" fill="none" stroke="#38d9c4" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-        </div>
+  <!-- TECH STACK -->
+  <section class="tech-stack">
+    <div class="wrap">
+      <p class="eyebrow reveal center-head-eyebrow">Tech Stack</p>
+      <h2 class="reveal center-head">Built on tools that scale.</h2>
+    </div>
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span class="tech-chip">Next.js</span>
+        <span class="tech-chip">React</span>
+        <span class="tech-chip">TypeScript</span>
+        <span class="tech-chip">Tailwind</span>
+        <span class="tech-chip">Node.js</span>
+        <span class="tech-chip">Python</span>
+        <span class="tech-chip">PostgreSQL</span>
+        <span class="tech-chip">AWS</span>
+        <span class="tech-chip">Azure</span>
+        <span class="tech-chip">Docker</span>
+        <span class="tech-chip">Redis</span>
+        <span class="tech-chip">OpenAI</span>
+        <span class="tech-chip">Next.js</span>
+        <span class="tech-chip">React</span>
+        <span class="tech-chip">TypeScript</span>
+        <span class="tech-chip">Tailwind</span>
+        <span class="tech-chip">Node.js</span>
+        <span class="tech-chip">Python</span>
+        <span class="tech-chip">PostgreSQL</span>
+        <span class="tech-chip">AWS</span>
+        <span class="tech-chip">Azure</span>
+        <span class="tech-chip">Docker</span>
+        <span class="tech-chip">Redis</span>
+        <span class="tech-chip">OpenAI</span>
       </div>
     </div>
   </section>
@@ -389,12 +489,8 @@
 <footer class="site-footer">
   <div class="wrap footer-inner">
     <div class="footer-brand">
-      <a href="#top" class="brand" aria-label="Quvexa Tech home">
-        <span class="brand-mark"><img src="assets/logo.svg" alt="" class="brand-logo-img" width="28" height="28"></span>
-        <span class="brand-text">
-          <span class="brand-name">QUVEXA</span>
-          <span class="brand-tech">TECH</span>
-        </span>
+      <a href="#top" class="brand brand-full" aria-label="Quvexa Tech home">
+        <img src="assets/logo.png" alt="Quvexa Tech" class="brand-logo-img" width="60" height="60" onerror="this.onerror=null;this.src='assets/logo.svg'">
       </a>
       <p class="footer-tagline">© 2025 Quvexa Tech. All rights reserved.</p>
       <div class="social-row">
@@ -407,27 +503,18 @@
 
     <div class="footer-col">
       <h4>Products</h4>
+      <a href="#products">Restaurant Suite</a>
       <a href="#products">School ERP</a>
-      <a href="#products">Restaurant POS</a>
-      <a href="#products">E-Commerce</a>
-      <a href="#products">All Products</a>
-    </div>
-
-    <div class="footer-col">
-      <h4>Solutions</h4>
-      <a href="#products">Education</a>
-      <a href="#products">Restaurants</a>
-      <a href="#products">Retail</a>
-      <a href="#products">Healthcare</a>
-      <a href="#products">Logistics</a>
-      <a href="#products">And More</a>
+      <a href="#products">Business CRM</a>
+      <a href="#products">AI Chat Assistant</a>
+      <a href="#products">View all products</a>
     </div>
 
     <div class="footer-col">
       <h4>Company</h4>
+      <a href="#why">Why Quvexa</a>
+      <a href="#process">Our Process</a>
       <a href="#contact">About Us</a>
-      <a href="#contact">Careers</a>
-      <a href="#contact">Blog</a>
       <a href="#contact">Contact Us</a>
     </div>
 
@@ -435,7 +522,6 @@
       <h4>Resources</h4>
       <a href="#contact">Documentation</a>
       <a href="#contact">Help Center</a>
-      <a href="#contact">Case Studies</a>
       <a href="#contact">Guides</a>
     </div>
 

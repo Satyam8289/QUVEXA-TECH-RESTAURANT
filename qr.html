@@ -85,7 +85,9 @@
     }
 
     const baseInput = document.getElementById("baseUrl");
-    const defaultBase = new URL("menu.html", location.href).href;
+    // Table QR codes always land on index.html (the branded entry page,
+    // which then leads into the menu) — never menu.html directly.
+    const defaultBase = new URL("index.html", location.href).href;
 
     function urlFor(table) {
       const base = baseInput.value.trim() || defaultBase;

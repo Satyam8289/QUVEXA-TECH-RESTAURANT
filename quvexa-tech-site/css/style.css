@@ -104,7 +104,7 @@ h3{ font-size: 1.1rem; }
 
 .brand{ display: flex; align-items: center; gap: 9px; margin-right: auto; }
 .brand-full{ display: flex; align-items: center; }
-.brand-logo-img{ display: block; width: auto; object-fit: contain; mix-blend-mode: multiply; }
+.brand-logo-img{ display: block; width: auto; object-fit: contain; }
 
 .main-nav{ display: flex; align-items: center; gap: 26px; }
 .main-nav > a{ font-size: 0.9rem; font-weight: 500; color: var(--text-muted); transition: color .2s var(--ease); }
@@ -467,6 +467,9 @@ h3{ font-size: 1.1rem; }
   .hero-ctas{ flex-direction: column; align-items: stretch; }
   .hero-ctas .btn{ width: 100%; }
   .hero-trust{ gap: 16px; }
+  .device-side{ display: none; }
+  .device-main{ padding: 14px; }
+  .device-title{ font-size: 0.76rem; }
   .kpi-row{ grid-template-columns: 1fr 1fr; }
   .chart-row, .lower-row{ grid-template-columns: 1fr; }
   .orders-row{ grid-template-columns: 1fr 1fr 1fr; font-size: 0.56rem; }

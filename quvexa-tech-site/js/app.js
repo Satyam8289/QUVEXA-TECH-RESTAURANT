@@ -112,7 +112,9 @@
   const validators = {
     name: (v) => v.trim().length > 1,
     businessType: (v) => v.trim().length > 0,
-    email: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()),
+    // Email is optional now: blank passes, but if something's entered it must look like an email.
+    email: (v) => v.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()),
+    phone: (v) => v.trim().length >= 7,
     message: (v) => v.trim().length > 4,
   };
 

@@ -475,14 +475,15 @@
           </div>
 
           <div class="field">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" autocomplete="email" required placeholder="you@business.com">
+            <label for="email">Email <span class="optional">(optional)</span></label>
+            <input type="email" id="email" name="email" autocomplete="email" placeholder="you@business.com">
             <span class="field-error">Please enter a valid email.</span>
           </div>
 
           <div class="field">
-            <label for="phone">Phone <span class="optional">(optional)</span></label>
-            <input type="tel" id="phone" name="phone" autocomplete="tel" placeholder="+91 98765 43210">
+            <label for="phone">Phone</label>
+            <input type="tel" id="phone" name="phone" autocomplete="tel" required placeholder="+91 98765 43210">
+            <span class="field-error">Please enter your phone number.</span>
           </div>
 
           <div class="field field-full">

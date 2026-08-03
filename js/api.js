@@ -17,8 +17,13 @@ const Api = (() => {
   // files are instead deployed to Vercel, there's no backend on that origin
   // at all — cross the wire to the VPS's own API domain explicitly.
   const CROSS_ORIGIN_API = "https://api.quvexatech.com";
-  const onVercel = /\.vercel\.app$/.test(location.hostname) || location.hostname === "app.quvexatech.com" || location.hostname === "superadmin.quvexatech.com";
-  const BASE = (window.FH_API_BASE || (onVercel ? CROSS_ORIGIN_API : "")) + "/api";
+  // Local dev only: server.js serves both API and static files from one
+  // process on localhost. Everywhere else — app.quvexatech.com,
+  // superadmin.quvexatech.com, *.vercel.app, and any restaurant's own
+  // custom domain pointed at this Vercel deployment — there is no backend
+  // on that origin at all, so cross the wire to the VPS explicitly.
+  const isLocalDev = location.hostname === "localhost" || location.hostname === "127.0.0.1" || /^\d+\.\d+\.\d+\.\d+$/.test(location.hostname);
+  const BASE = (window.FH_API_BASE || (isLocalDev ? "" : CROSS_ORIGIN_API)) + "/api";
 
   const SLUG_KEY = "foodhouse-tenant-slug";
   const TOKEN_KEY = "foodhouse-token";

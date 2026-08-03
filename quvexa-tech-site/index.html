@@ -434,6 +434,10 @@
       </div>
 
       <form class="contact-form reveal" id="contactForm" novalidate>
+        <input type="hidden" name="access_key" value="0ad65a24-1338-4d58-8461-9373dcacf58f">
+        <input type="hidden" name="subject" value="New enquiry from quvexatech.com">
+        <input type="hidden" name="from_name" value="Quvexa Tech Website">
+
         <div class="form-success" id="formSuccess" hidden>
           <div class="success-icon" aria-hidden="true">
             <svg viewBox="0 0 40 40" width="32" height="32"><circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 21l5 5 11-12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -441,6 +445,10 @@
           <h3>Message sent.</h3>
           <p>Thanks — we'll get back to you within one business day.</p>
           <button type="button" class="btn btn-ghost" id="sendAnotherBtn">Send another message</button>
+        </div>
+
+        <div class="form-error-banner" id="formErrorBanner" hidden role="alert">
+          Something went wrong sending your message. Please try again, or email us directly.
         </div>
 
         <div class="hp-field" aria-hidden="true">

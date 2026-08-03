@@ -106,6 +106,7 @@
   // Contact form validation + submit
   const form = document.getElementById('contactForm');
   const formSuccess = document.getElementById('formSuccess');
+  const formErrorBanner = document.getElementById('formErrorBanner');
   const submitBtn = form.querySelector('.btn-submit');
 
   const validators = {
@@ -132,7 +133,7 @@
     });
   });
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     // Honeypot: real users never see or fill this field. If it has a value, silently drop the submit.
@@ -149,18 +150,33 @@
       return;
     }
 
+    formErrorBanner.hidden = true;
     submitBtn.classList.add('loading');
     submitBtn.disabled = true;
 
-    window.setTimeout(() => {
-      submitBtn.classList.remove('loading');
-      submitBtn.disabled = false;
+    try {
+      const response = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body: new FormData(form),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Submission failed');
+      }
+
       form.reset();
       form.querySelectorAll('.field.invalid').forEach(f => f.classList.remove('invalid'));
       formSuccess.hidden = false;
       formSuccess.setAttribute('tabindex', '-1');
       formSuccess.focus();
-    }, 900);
+    } catch (err) {
+      formErrorBanner.hidden = false;
+    } finally {
+      submitBtn.classList.remove('loading');
+      submitBtn.disabled = false;
+    }
   });
 
   // "Send another message" — hide the success state and show the blank form again.

@@ -153,11 +153,6 @@ h3{ font-size: 1.1rem; }
 .hero{ position: relative; padding: 162px 0 90px; background: linear-gradient(180deg, #fbfaff, #ffffff 60%); overflow: hidden; }
 .hero-inner{ position: relative; display: grid; grid-template-columns: 0.95fr 1.15fr; gap: 44px; align-items: center; }
 
-.hero-badge{
-  display: inline-block; font-size: 0.78rem; font-weight: 600; color: var(--purple-dark);
-  background: var(--bg-soft); border: 1px solid #e3daff;
-  padding: 6px 14px; border-radius: 999px; margin-bottom: 20px;
-}
 .hero-title{ font-size: clamp(2.1rem, 4vw, 3rem); margin: 0 0 16px; }
 .hero-sub{ font-size: 1.05rem; color: var(--text-muted); max-width: 440px; margin: 0 0 28px; }
 .hero-ctas{ display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 34px; }
@@ -423,7 +418,7 @@ h3{ font-size: 1.1rem; }
 
 /* ================= Footer ================= */
 .site-footer{ background: #fff; border-top: 1px solid var(--border); padding: 56px 0 0; }
-.footer-inner{ display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr 1.2fr; gap: 32px; padding-bottom: 44px; }
+.footer-inner{ display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.2fr; gap: 32px; padding-bottom: 44px; }
 .footer-brand .brand{ margin-right: 0; margin-bottom: 14px; }
 .footer-tagline{ color: var(--text-faint); font-size: 0.82rem; margin: 0 0 16px; }
 .footer-col h4{ font-size: 0.76rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); margin: 0 0 16px; }

@@ -163,6 +163,16 @@
     }, 900);
   });
 
+  // "Send another message" — hide the success state and show the blank form again.
+  const sendAnotherBtn = document.getElementById('sendAnotherBtn');
+  if (sendAnotherBtn) {
+    sendAnotherBtn.addEventListener('click', () => {
+      formSuccess.hidden = true;
+      const firstField = form.querySelector('input, select, textarea');
+      if (firstField) firstField.focus();
+    });
+  }
+
   // Newsletter form
   const newsletterForm = document.getElementById('newsletterForm');
   if (newsletterForm) {

@@ -410,6 +410,7 @@ h3{ font-size: 1.1rem; }
 .success-icon{ color: #1fae7a; margin-bottom: 14px; }
 .form-success h3{ margin-bottom: 8px; }
 .form-success p{ color: var(--text-muted); margin: 0; }
+.form-success .btn{ margin-top: 24px; }
 @keyframes fadeScale{ from{ opacity: 0; transform: scale(0.96); } to{ opacity: 1; transform: scale(1); } }
 
 /* ================= Footer ================= */

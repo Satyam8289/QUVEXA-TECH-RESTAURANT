@@ -60,6 +60,7 @@
     // end-to-end) — just hidden from the UI for now. Flip to true to bring
     // the "WhatsApp order confirmation" panel back in Settings.
     const SHOW_WHATSAPP_SETTINGS = false;
+    const SHOW_GEOFENCE_SETTINGS = false;
 
     const view = document.getElementById("view");
     const STATUSES = ["pending", "preparing", "ready", "served"];
@@ -644,6 +645,23 @@
                 ` : `<p style="font-size:13px;color:var(--muted)">${s.whatsappConnected ? `WhatsApp confirmation is ${s.whatsappEnabled ? "on" : "off"}.` : "Not connected yet — ask the owner to set it up."} (owner only)</p>`}
               </div>
               ` : ""}
+              ${SHOW_GEOFENCE_SETTINGS ? `
+              <div class="panel card">
+                <div class="panel-head"><h3>Dine-in location check</h3>${s.geofenceEnabled ? `<span class="badge ready">On</span>` : ""}</div>
+                <p class="settings-hint" style="margin:0 0 12px">Optional — block dine-in orders placed from far outside the restaurant. Stand at the restaurant and tap "Use my current location" to set the center point, then customers ordering dine-in must be within the radius. Takeaway is never affected.</p>
+                ${role === "owner" ? `
+                  <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+                    <label class="switch"><input type="checkbox" id="geoToggle" ${s.geofenceEnabled ? "checked" : ""}><span class="slider"></span></label>
+                    <p class="settings-hint" style="margin:0">Off by default — nothing is checked unless you enable it here.</p>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+                    <button type="button" class="btn btn-ghost" id="geoCapture">Use my current location</button>
+                    <p class="settings-hint" style="margin:0" id="geoCoords">${s.geofenceLat != null ? `Set: ${Number(s.geofenceLat).toFixed(5)}, ${Number(s.geofenceLng).toFixed(5)}` : "Not set yet"}</p>
+                  </div>
+                  <div class="field" style="margin-bottom:0"><label>Radius (meters)</label><input class="input" id="geoRadius" type="number" min="50" value="${s.geofenceRadiusM || 300}"></div>
+                ` : `<p style="font-size:13px;color:var(--muted)">Location check is ${s.geofenceEnabled ? "on" : "off"}. (owner only)</p>`}
+              </div>
+              ` : ""}
               <div class="panel card">
                 <div class="panel-head"><h3>Loyalty rewards</h3>${s.loyaltyEnabled ? `<span class="badge ready">On</span>` : ""}</div>
                 <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
@@ -697,6 +715,20 @@
       });
 
       let pendingLogo = null;
+      let pendingGeo = null;
+      const geoCaptureBtn = document.getElementById("geoCapture");
+      if (geoCaptureBtn) geoCaptureBtn.addEventListener("click", () => {
+        if (!navigator.geolocation) { App.toast("Location isn't available on this device/browser"); return; }
+        geoCaptureBtn.disabled = true; geoCaptureBtn.textContent = "Locating…";
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            pendingGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            document.getElementById("geoCoords").textContent = `Set: ${pendingGeo.lat.toFixed(5)}, ${pendingGeo.lng.toFixed(5)} (unsaved — click Save)`;
+            geoCaptureBtn.disabled = false; geoCaptureBtn.textContent = "Use my current location";
+          },
+          () => { App.toast("Couldn't get location — check browser permission"); geoCaptureBtn.disabled = false; geoCaptureBtn.textContent = "Use my current location"; }
+        );
+      });
       document.getElementById("logoInput").addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -735,6 +767,11 @@
         if (waLang) patch.whatsappTemplateLang = waLang.value.trim();
         const waToken = document.getElementById("waToken");
         if (waToken && waToken.value.trim()) patch.whatsappAccessToken = waToken.value.trim();
+        const geoToggle = document.getElementById("geoToggle");
+        if (geoToggle) patch.geofenceEnabled = geoToggle.checked;
+        const geoRadius = document.getElementById("geoRadius");
+        if (geoRadius) patch.geofenceRadiusM = Number(geoRadius.value);
+        if (typeof pendingGeo !== "undefined" && pendingGeo) { patch.geofenceLat = pendingGeo.lat; patch.geofenceLng = pendingGeo.lng; }
         if (pendingLogo !== null) {
           // Upload to Cloudflare R2 so the logo isn't stored inline as a huge
           // base64 blob in Postgres; falls back to the old inline storage if

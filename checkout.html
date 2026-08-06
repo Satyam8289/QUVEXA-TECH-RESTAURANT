@@ -145,6 +145,7 @@
     }
 
     let tenantName = "";
+    let geofenceEnabled = false;
     async function main() {
       let closed = false;
       try {
@@ -152,6 +153,7 @@
         closed = !!data.tenant.isClosed;
         tenantName = data.tenant.name;
         razorpayEnabled = !!data.tenant.razorpayEnabled;
+        geofenceEnabled = !!data.tenant.geofenceEnabled;
       } catch (e) { /* keep going, backend errors surface on submit */ }
       document.getElementById("brand").innerHTML = App.brandBar({ back: "cart.html", subtitle: "Checkout" });
       if (closed) {
@@ -169,6 +171,20 @@
     }
     main();
 
+    // Dine-in geofencing — off unless the restaurant enabled it in Settings.
+    // Resolves to null on denial/timeout; the server rejects a dine-in order
+    // that's missing coordinates when the check is on, with a clear message.
+    function getGeo() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve(null);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null),
+          { timeout: 8000 }
+        );
+      });
+    }
+
     document.getElementById("checkoutForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const name = document.getElementById("name").value.trim();
@@ -185,6 +201,14 @@
       const items = Cart.all().map(l => ({ id: l.id, name: l.name, qty: l.qty, price: l.price, note: l.note || "" }));
       const submitBtn = document.querySelector('#dock button');
       const resetBtn = () => { submitBtn.disabled = false; submitBtn.textContent = `Place Order · ${App.money(total())}`; };
+
+      // Only asked for dine-in, and only when the restaurant turned this on.
+      let geo = null;
+      if (!TAKEAWAY && geofenceEnabled) {
+        submitBtn.disabled = true; submitBtn.textContent = "Checking location…";
+        geo = await getGeo();
+        submitBtn.disabled = false; submitBtn.textContent = `Place Order · ${App.money(total())}`;
+      }
 
       if (method === "Online" && razorpayEnabled) {
         submitBtn.disabled = true; submitBtn.textContent = "Starting payment…";
@@ -209,6 +233,7 @@
                   razorpay_signature: resp.razorpay_signature,
                   table: TAKEAWAY ? null : Number(table), customer: name, phone, items,
                   orderType: ORDER_TYPE, vehicleNumber: vehicle,
+                  ...(geo ? { lat: geo.lat, lng: geo.lng } : {}),
                 });
                 localStorage.setItem("foodhouse-lastOrder", order.code);
                 localStorage.setItem("foodhouse-lastOrderToken", order.token || "");
@@ -239,7 +264,7 @@
       const orderMethod = method === "Online" ? "Card/UPI" : method;
       submitBtn.disabled = true; submitBtn.textContent = "Placing order…";
       try {
-        const order = await Api.placeOrderPublic({ table: Number(table), customer: name, phone, method: orderMethod, items, orderType: "dine-in" });
+        const order = await Api.placeOrderPublic({ table: Number(table), customer: name, phone, method: orderMethod, items, orderType: "dine-in", ...(geo ? { lat: geo.lat, lng: geo.lng } : {}) });
         localStorage.setItem("foodhouse-lastOrder", order.code);
                 localStorage.setItem("foodhouse-lastOrderToken", order.token || "");
         Cart.clear();

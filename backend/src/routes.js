@@ -114,6 +114,16 @@ export async function loyaltyDiscount(client, tenant, phone, subtotal) {
   return Math.round(subtotal * percent / 100);
 }
 
+// Haversine distance in meters — used by the (currently off-by-default)
+// dine-in geofence check.
+function distanceMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 async function createOrder(client, tenantId, body) {
   const rawItems = Array.isArray(body.items) ? body.items : [];
   if (!rawItems.length) throw Object.assign(new Error("Order has no items"), { status: 400 });
@@ -131,6 +141,17 @@ async function createOrder(client, tenantId, body) {
     throw Object.assign(new Error("Please enter your vehicle number"), { status: 400 });
   const table = orderType === "dine-in" ? (body.table ? Number(body.table) : null) : null;
   const tenant = (await client.query("SELECT * FROM tenants WHERE id=$1", [tenantId])).rows[0];
+  // Geofencing: built and ready, but each tenant's geofence_enabled defaults
+  // to false, so this is a no-op until a tenant is explicitly switched on.
+  // Only guards dine-in — takeaway/car service is picked up, not eaten in
+  // the restaurant, so proximity isn't the point there.
+  if (orderType === "dine-in" && tenant.geofence_enabled && tenant.geofence_lat != null && tenant.geofence_lng != null) {
+    const lat = Number(body.lat), lng = Number(body.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng))
+      throw Object.assign(new Error("Please allow location access to place a dine-in order."), { status: 400 });
+    if (distanceMeters(lat, lng, tenant.geofence_lat, tenant.geofence_lng) > tenant.geofence_radius_m)
+      throw Object.assign(new Error("You seem to be too far from the restaurant for a dine-in order. Try takeaway instead."), { status: 400 });
+  }
   const { tax, serviceCharge, discount, total } = await priceOrder(client, tenant, items, phone);
   const code = await nextOrderCode(client, tenantId);
   const method = body.method || "Cash";
@@ -180,6 +201,9 @@ const publicTenant = (t) => ({
   // The actual key id (needed to open Razorpay's checkout) is fetched per-order
   // from the /razorpay/order endpoint below, never handed out in bulk here.
   razorpayEnabled: !!(t.razorpay_key_id && t.razorpay_key_secret),
+  // Just tells the customer app whether to ask for location before a dine-in
+  // order — the actual coordinates stay server-side, never handed to the browser.
+  geofenceEnabled: !!t.geofence_enabled,
 });
 
 /* ==================== AUTH ==================== */
@@ -544,6 +568,9 @@ r.get("/settings", auth, h(async (req, res) => {
     whatsappTemplateName: t.whatsapp_template_name || "order_confirmation",
     whatsappTemplateLang: t.whatsapp_template_lang || "en_US",
     whatsappConnected: !!(t.whatsapp_phone_number_id && t.whatsapp_access_token),
+    geofenceLat: t.geofence_lat,
+    geofenceLng: t.geofence_lng,
+    geofenceRadiusM: t.geofence_radius_m,
   });
 }));
 
@@ -578,6 +605,13 @@ r.put("/settings", auth, requireRole("owner", "manager"), h(async (req, res) => 
     if (b.whatsappTemplateLang !== undefined) set("whatsapp_template_lang", String(b.whatsappTemplateLang).trim() || "en_US");
     // Same "blank = unchanged" pattern as the Razorpay secret.
     if (b.whatsappAccessToken) set("whatsapp_access_token", String(b.whatsappAccessToken).trim());
+
+    // Dine-in geofencing — built and ready, off by default per tenant.
+    // Owner-only: it's an anti-fraud control, not day-to-day operations.
+    set("geofence_enabled", b.geofenceEnabled);
+    if (b.geofenceLat !== undefined) set("geofence_lat", b.geofenceLat === null ? null : Number(b.geofenceLat));
+    if (b.geofenceLng !== undefined) set("geofence_lng", b.geofenceLng === null ? null : Number(b.geofenceLng));
+    if (b.geofenceRadiusM !== undefined) set("geofence_radius_m", Math.max(50, Number(b.geofenceRadiusM) || 300));
   }
   if (!fields.length) return res.json({ ok: true });
   vals.push(req.user.tid);

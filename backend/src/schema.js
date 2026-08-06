@@ -37,6 +37,13 @@ ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_phone_number_id TEXT;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_access_token TEXT;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_template_name TEXT DEFAULT 'order_confirmation';
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_template_lang TEXT DEFAULT 'en_US';
+-- Geofencing: restrict dine-in orders to customers physically near the
+-- restaurant. Built and ready, but off by default per-tenant (geofence_enabled)
+-- — enable only when explicitly asked for.
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS geofence_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS geofence_lat DOUBLE PRECISION;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS geofence_lng DOUBLE PRECISION;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS geofence_radius_m INT NOT NULL DEFAULT 300;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_custom_domain ON tenants(custom_domain) WHERE custom_domain IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS users (

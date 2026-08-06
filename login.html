@@ -51,14 +51,23 @@
   <script src="js/cart.js"></script>
   <script src="js/app.js"></script>
   <script>
-    // If already signed in, go straight to the dashboard.
+    // Demo-gate handoff (demo.html): this is a public link, so the browser
+    // may already hold a signed-in session for some other restaurant (e.g.
+    // staff testing their own account earlier). Force a clean slate first —
+    // otherwise the "already signed in" check below would silently redirect
+    // straight into that OTHER restaurant's dashboard instead of the demo.
+    const params0 = new URLSearchParams(location.search);
+    const isDemoGate = params0.get("r") === "quvexa-demo" && params0.get("demo") === "1";
+    if (isDemoGate) Api.logout();
+
+    // If already signed in (and this isn't the demo gate we just cleared), go
+    // straight to the dashboard.
     if (Api.isAuthed()) location.replace("dashboard.html");
 
-    // Demo-gate handoff (demo.html): pre-fill the dedicated sandbox account's
-    // credentials — hardcoded here, never passed through the URL, and only
-    // for this one safe demo tenant (real menu, zero real orders/customers).
-    const params0 = new URLSearchParams(location.search);
-    if (params0.get("r") === "quvexa-demo" && params0.get("demo") === "1") {
+    // Pre-fill the dedicated sandbox account's credentials — hardcoded here,
+    // never passed through the URL, and only for this one safe demo tenant
+    // (real menu, zero real orders/customers).
+    if (isDemoGate) {
       document.getElementById("username").value = "demo_owner";
       document.getElementById("password").value = "QuvexaDemo@2026";
     }

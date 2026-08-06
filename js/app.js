@@ -19,6 +19,8 @@ const App = (() => {
   const ICONS = {
     cart:    '<path d="M6 6h15l-1.5 9h-12L6 3H3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/>',
     menu:    '<path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    bell:    '<path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6.5H4c.5-1 2-2.5 2-6.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M10 19.5a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    refresh: '<path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 3v4h-4M6 21v-4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
     search:  '<circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.2-3.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
     plus:    '<path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
     minus:   '<path d="M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
@@ -272,8 +274,8 @@ App.mountTopbar = function (elId, title, onRefresh) {
     <div class="titles"><span class="dash-eyebrow">RESTRO</span><h1 id="tbTitle">${title}</h1></div>
     <div class="actions">
       <div class="tt-search">${App.icon("search", 16)}<input id="tbSearch" placeholder="Search orders, items…" autocomplete="off" /></div>
-      <button class="tt-icon" id="tbRefresh" title="Refresh" type="button">${App.icon("dashboard", 18)}</button>
-      <button class="tt-icon" id="tbBell" title="Notifications" type="button">${App.icon("alert", 18)}<span class="dot" id="tbDot" style="display:none"></span></button>
+      <button class="tt-icon" id="tbRefresh" title="Refresh" type="button">${App.icon("refresh", 18)}</button>
+      <button class="tt-icon" id="tbBell" title="Notifications" type="button">${App.icon("bell", 18)}<span class="dot" id="tbDot" style="display:none"></span></button>
       <div class="tt-user"><span class="avatar">${App.initials(user.name)}</span>
         <div><b>${user.name}</b><small>${cap(user.role)}</small></div></div>
     </div>`;

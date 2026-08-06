@@ -51,12 +51,22 @@ async function main() {
   const ORDER_COUNT = 26;
   const now = Date.now();
 
+  // The VPS runs in UTC, but "11am-10pm business hours" and "today" only
+  // make sense in IST (UTC+5:30) — the restaurant's own timezone. Building
+  // these with plain setHours() used the server's UTC clock instead, so a
+  // 10pm IST-intended order landed at 22:00 UTC, which IS 3:30am the NEXT
+  // calendar day in IST — hence orders appearing to be from "tomorrow".
+  const IST_OFFSET_MS = 5.5 * 3600 * 1000;
+  const nowIST = new Date(now + IST_OFFSET_MS);
+
   for (let i = 0; i < ORDER_COUNT; i++) {
     // Spread across the last 6 days, skewed toward more-recent (today looks busiest).
     const daysAgo = i < 6 ? 0 : randInt(0, 5);
     const hour = randInt(11, 22);
-    const createdAt = new Date(now - daysAgo * 86400000);
-    createdAt.setHours(hour, randInt(0, 59), 0, 0);
+    const istWallClock = new Date(nowIST);
+    istWallClock.setUTCDate(istWallClock.getUTCDate() - daysAgo);
+    istWallClock.setUTCHours(hour, randInt(0, 59), 0, 0);
+    const createdAt = new Date(istWallClock.getTime() - IST_OFFSET_MS);
 
     const isTakeaway = Math.random() < 0.25;
     const itemCount = randInt(1, 4);

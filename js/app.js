@@ -18,6 +18,7 @@ const App = (() => {
   /* ---- Inline SVG icon set (no emojis, no icon libs) ---- */
   const ICONS = {
     cart:    '<path d="M6 6h15l-1.5 9h-12L6 3H3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/>',
+    menu:    '<path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
     search:  '<circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.2-3.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
     plus:    '<path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
     minus:   '<path d="M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
@@ -246,6 +247,8 @@ App.mountSidebar = function (elId, active) {
     <a class="navlink" href="index.html">${App.icon("leaf", 19)} Customer view</a>
     <a class="navlink" id="logoutLink" href="login.html">${App.icon("logout", 19)} Sign out</a>`;
   el.querySelector("#logoutLink").addEventListener("click", () => App.logout());
+  // On mobile the sidebar is a drawer — close it once a link is actually used.
+  el.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => App.closeSidebar()));
 };
 App.setActiveNav = function (elId, active) {
   document.querySelectorAll(`#${elId} .navlink`).forEach((a) => a.classList.toggle("active", a.dataset.key === active));
@@ -265,6 +268,7 @@ App.mountTopbar = function (elId, title, onRefresh) {
   if (!el) return;
   const user = App.currentUser() || { name: "Owner", role: "owner" };
   el.innerHTML = `
+    <button class="tt-icon tt-menu-toggle" id="tbMenuToggle" title="Menu" type="button">${App.icon("menu", 18)}</button>
     <div class="titles"><span class="dash-eyebrow">RESTRO</span><h1 id="tbTitle">${title}</h1></div>
     <div class="actions">
       <div class="tt-search">${App.icon("search", 16)}<input id="tbSearch" placeholder="Search orders, items…" autocomplete="off" /></div>
@@ -274,6 +278,36 @@ App.mountTopbar = function (elId, title, onRefresh) {
         <div><b>${user.name}</b><small>${cap(user.role)}</small></div></div>
     </div>`;
   if (onRefresh) document.getElementById("tbRefresh").addEventListener("click", onRefresh);
+  document.getElementById("tbMenuToggle").addEventListener("click", App.toggleSidebar);
+};
+
+/* ---- Mobile sidebar drawer: the sidebar itself stays the same markup,
+   this just slides it in/out with a tap-to-close backdrop on small screens
+   (the horizontal pill strip below the topbar remains for quick jumps). ---- */
+App.openSidebar = function () {
+  const sidebar = document.getElementById("sidebar");
+  if (!sidebar) return;
+  let backdrop = document.getElementById("sidebarBackdrop");
+  if (!backdrop) {
+    backdrop = document.createElement("div");
+    backdrop.id = "sidebarBackdrop";
+    backdrop.className = "sidebar-backdrop";
+    backdrop.addEventListener("click", App.closeSidebar);
+    document.body.appendChild(backdrop);
+  }
+  sidebar.classList.add("mobile-open");
+  backdrop.classList.add("show");
+};
+App.closeSidebar = function () {
+  const sidebar = document.getElementById("sidebar");
+  if (sidebar) sidebar.classList.remove("mobile-open");
+  const backdrop = document.getElementById("sidebarBackdrop");
+  if (backdrop) backdrop.classList.remove("show");
+};
+App.toggleSidebar = function () {
+  const sidebar = document.getElementById("sidebar");
+  if (sidebar && sidebar.classList.contains("mobile-open")) App.closeSidebar();
+  else App.openSidebar();
 };
 App.setTopbarTitle = (title) => { const h1 = document.getElementById("tbTitle"); if (h1) h1.textContent = title; };
 App.setNotifDot = (show) => { const d = document.getElementById("tbDot"); if (d) d.style.display = show ? "block" : "none"; };
